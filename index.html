@@ -1,0 +1,1977 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>RPG QUEST</title>
+<style>
+  :root { --bg-color: #000; --text-color: #fff; --border-color: #fff; }
+  * { box-sizing: border-box; user-select: none; font-family: "Courier New", monospace; }
+  body { margin: 0; padding: 0; background-color: #222; color: var(--text-color); display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+  #app { width: 100vw; height: calc(100vw * 16 / 9); max-width: 50vh; max-height: 100vh; aspect-ratio: 9 / 16; background-color: var(--bg-color); display: flex; flex-direction: column; position: relative; box-shadow: 0 0 20px rgba(0,0,0,1); overflow: hidden; }
+  @media (min-aspect-ratio: 9/16) { #app { height: 100vh; width: calc(100vh * 9 / 16); } }
+  #fade-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: black; opacity: 0; pointer-events: none; transition: opacity 0.5s; z-index: 100; }
+  #fade-overlay.active { opacity: 1; pointer-events: auto; }
+  #transition-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 90; display: none; pointer-events: none; image-rendering: pixelated; }
+  #game-display { flex: 6; position: relative; overflow: hidden; background-color: var(--bg-color); }
+  .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: none; flex-direction: column; padding: 10px; }
+  .screen.active { display: flex; }
+  #title-screen, #name-input-screen { align-items: center; justify-content: center; }
+  h1 { font-size: 32px; margin-bottom: 40px; text-align: center; }
+  .menu-item { font-size: 18px; margin: 8px 0; cursor: pointer; position: relative; padding-left: 20px;}
+  .menu-item:before { content: " "; position: absolute; left: 0; }
+  .menu-item.selected:before { content: "▶"; }
+  input[type="text"] { background: var(--bg-color); color: var(--text-color); border: 2px solid var(--border-color); font-size: 20px; padding: 10px; width: 80%; text-align: center; }
+  canvas { display: block; width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; }
+  .ui-window { background: rgba(0,0,0,0.9); border: 2px solid var(--border-color); padding: 10px; font-size: 15px; line-height: 1.5; z-index: 20; display: none; }
+  #message-window { position: absolute; bottom: 20px; left: 10px; right: 10px; height: 100px; }
+  #message-window.active { display: block; }
+  #shop-window { position: absolute; top: 10px; left: 10px; right: 10px; bottom: 130px; display: none; flex-direction: column; z-index: 30; }
+  #shop-window.active { display: flex; }
+  #shop-list { flex: 1; overflow-y: auto; margin-top: 10px; border-top: 1px solid #fff; padding-top: 10px; }
+  #confirm-window { position: absolute; bottom: 130px; right: 10px; z-index: 40; min-width: 100px; display: none; flex-direction: column; }
+  #confirm-window.active { display: flex; }
+  #battle-screen { padding: 0; height: 100%; min-height: 0; }
+  #battle-top { flex: 1 1 auto; min-height: 0; display: flex; position: relative; padding: 10px; }
+  #player-status-window { border: 2px solid var(--border-color); padding: 10px; width: 120px; position: absolute; top: 10px; left: 10px; font-size: 14px; background: rgba(0,0,0,0.8); z-index: 5; }
+  #enemy-area { flex: 1; display: flex; align-items: center; justify-content: center; min-height: 0; }
+  #enemy-img { width: 100px; height: 100px; flex-shrink: 0; background-color: var(--text-color); color: var(--bg-color); display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 24px; }
+  #battle-log { flex: 0 0 35%; min-height: 0; max-height: 35%; border-top: 2px solid var(--border-color); padding: 10px; overflow-y: auto; font-size: 14px; line-height: 1.4; }
+  #battle-commands { position: absolute; bottom: 10px; right: 10px; border: 2px solid var(--border-color); background: var(--bg-color); padding: 10px; z-index: 10; }
+  #battle-sub-window { position: absolute; bottom: 10px; right: 130px; border: 2px solid var(--border-color); background: var(--bg-color); padding: 10px; min-width: 120px; z-index: 10; }
+  #menu-screen { flex-direction: column; }
+  .menu-box { border: 2px solid var(--border-color); padding: 10px; margin: 5px; }
+  #menu-main { flex: 1; }
+  #menu-details { flex: 2; display: flex; flex-direction: column; overflow-y: auto; }
+  #controls-area { flex: 4; position: relative; background-color: #111; border-top: 2px solid var(--border-color); }
+  #btn-menu { position: absolute; top: 15px; right: 15px; border: 2px solid var(--border-color); background: var(--bg-color); color: var(--text-color); padding: 5px 15px; border-radius: 5px; font-size: 14px; }
+  #d-pad { position: absolute; bottom: 20px; left: 15px; width: 130px; height: 130px; }
+  .d-btn { position: absolute; background: var(--bg-color); border: 2px solid var(--border-color); color: var(--text-color); font-size: 20px; font-weight: bold; width: 45px; height: 45px; text-align: center; line-height: 41px; border-radius: 5px; }
+  #btn-up { top: 0; left: 42.5px; } #btn-down { bottom: 0; left: 42.5px; }
+  #btn-left { top: 42.5px; left: 0; } #btn-right { top: 42.5px; left: 85px; }
+  #action-btns { position: absolute; bottom: 25px; right: 20px; width: 110px; height: 110px; }
+  .a-btn { position: absolute; background: var(--bg-color); border: 2px solid var(--border-color); color: var(--text-color); width: 50px; height: 50px; border-radius: 25px; text-align: center; line-height: 46px; font-size: 16px; font-weight: bold; }
+  #btn-cancel { bottom: 0; left: 0; } #btn-ok { top: 0; right: 0; }
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+  .anim-blink { animation: blink 0.2s 3; }
+  @keyframes shake-red { 0%, 100% { transform: translate(0, 0); background-color: var(--bg-color); } 25%, 75% { transform: translate(-5px, 0); background-color: #500; } 50% { transform: translate(5px, 0); background-color: #500; } }
+  .anim-damage { animation: shake-red 0.4s; }
+  @keyframes shake-critical { 
+  0%, 100% { transform: translate(0, 0) scale(1); filter: none; } 
+  20%, 60% { transform: translate(-10px, 0) scale(1.1); filter: drop-shadow(0 0 10px #f00) drop-shadow(0 0 5px #f00); } 
+  40%, 80% { transform: translate(10px, 0) scale(1.1); filter: drop-shadow(0 0 10px #ff0) drop-shadow(0 0 5px #ff0); } 
+}
+  .anim-critical { animation: shake-critical 0.5s; }
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="fade-overlay"></div>
+  <div id="game-display">
+    <canvas id="transition-canvas"></canvas>
+    <div id="title-screen" class="screen active">
+      <h1>RPG QUEST</h1>
+      <div class="menu-item selected" id="ts-new">はじめから</div>
+      <div class="menu-item" id="ts-continue" style="display: none;">つづきから</div>
+    </div>
+    <div id="name-input-screen" class="screen">
+      <p style="text-align:center;">なまえを いれてください</p>
+      <input type="text" id="player-name-input" maxlength="6" value="ゆうしゃ">
+      <p style="font-size:12px; margin-top:20px; text-align:center;">決定ボタン(右下)で進む</p>
+    </div>
+    <div id="field-screen" class="screen" style="padding:0;">
+      <canvas id="game-canvas"></canvas>
+      <div id="message-window" class="ui-window"><div id="message-text"></div><div style="position:absolute; bottom:5px; right:10px; font-size:12px;">▼</div></div>
+      <div id="shop-window" class="ui-window">
+        <div style="display:flex; justify-content:space-between; margin-bottom:5px;"><div id="shop-msg" style="flex:1;"></div><div style="text-align:right;">所持金: <span id="shop-gold">0</span> G</div></div>
+        <div id="shop-list"></div>
+      </div>
+      <div id="confirm-window" class="ui-window"><div class="menu-item selected" id="conf-yes">はい</div><div class="menu-item" id="conf-no">いいえ</div></div>
+    </div>
+    <div id="battle-screen" class="screen">
+      <div id="battle-top">
+        <div id="player-status-window"><div id="b-name">--</div><div>LV: <span id="b-lv"></span></div><div>HP: <span id="b-hp"></span></div><div>MP: <span id="b-mp"></span></div></div>
+        <div id="enemy-area"><div id="enemy-img">敵</div></div>
+        <div id="battle-commands" class="hidden"><div class="menu-item selected">たたかう</div><div class="menu-item">じゅもん</div><div class="menu-item">どうぐ</div><div class="menu-item">ぼうぎょ</div><div class="menu-item">にげる</div></div>
+        <div id="battle-sub-window" class="hidden"></div>
+      </div>
+      <div id="battle-log"></div>
+    </div>
+    <div id="menu-screen" class="screen">
+      <div class="menu-box" id="menu-main"><div class="menu-item selected">つよさ</div><div class="menu-item">そうび</div><div class="menu-item">どうぐ</div><div class="menu-item">じゅもん</div><div class="menu-item" style="margin-top:10px;">セーブ</div><div class="menu-item" style="margin-top:10px;">タイトルへもどる</div></div>
+      <div class="menu-box hidden" id="menu-details"></div>
+    </div>
+  </div>
+  <div id="controls-area">
+    <div id="btn-menu">メニュー</div>
+    <div id="d-pad"><div class="d-btn" id="btn-up">▲</div><div class="d-btn" id="btn-left">◀</div><div class="d-btn" id="btn-right">▶</div><div class="d-btn" id="btn-down">▼</div></div>
+    <div id="action-btns"><div class="a-btn" id="btn-cancel">✖</div><div class="a-btn" id="btn-ok">〇</div></div>
+  </div>
+</div>
+
+<script>
+const IMAGE_PATHS = {
+  tile_0: "images/map/pic00.png", 
+  tile_1: "images/map/pic01.png",
+  tile_2: "images/map/pic02.png",
+  tile_3: "images/map/pic03.png",
+  tile_4: "images/map/pic04.png",
+  tile_5: "images/map/pic05.png",
+  tile_6: "images/map/pic06.png",
+  tile_7: "images/map/pic07.png",
+  tile_8: "images/map/pic08.png",
+  tile_9: "images/map/pic09.png",
+  tile_10: "images/map/pic10.png",
+  tile_11: "images/map/pic11.png",
+  tile_12: "images/map/pic12.png",
+  tile_13: "images/map/pic13.png",
+  tile_14: "images/map/pic14.png",
+  tile_15: "images/map/pic15.png",
+  tile_16: "images/map/pic16.png",
+  tile_17: "images/map/pic17.png",
+  tile_18: "images/map/pic18.png",
+  tile_19: "images/map/pic19.png",
+  tile_20: "images/map/pic20.png",
+  npc: "images/character/npc.png",
+  shop: "images/character/shop.png",
+  king: "images/character/king.png",
+  player: "images/character/player.png",
+  treasure: "images/object/treasure.png",
+  pot: "images/object/pot.png",
+  barrel: "images/object/barrel.png",
+  monster01: "images/monster/monster01.png",
+  monster02: "images/monster/monster02.png", 
+  monster03: "images/monster/monster03.png",
+  monster04: "images/monster/monster04.png",
+  monster05: "images/monster/monster05.png",
+  monster06: "images/monster/monster06.png",
+  monster07: "images/monster/monster07.png",
+  monster08: "images/monster/monster08.png",
+  monster09: "images/monster/monster09.png",
+  monster10: "images/monster/monster10.png",
+  monster11: "images/monster/monster11.png",
+  monster12: "images/monster/monster12.png",
+  monster13: "images/monster/monster13.png",
+  monster14: "images/monster/monster14.png",
+  monster15: "images/monster/monster15.png",
+  monster16: "images/monster/monster16.png",
+  monster17: "images/monster/monster17.png",
+  monster18: "images/monster/monster18.png",
+  monster19: "images/monster/monster19.png",
+  monster20: "images/monster/monster20.png",
+  monster21: "images/monster/monster21.png",
+  monster22: "images/monster/monster22.png",
+  monster23: "images/monster/monster23.png",
+  monster24: "images/monster/monster24.png",
+  monster25: "images/monster/monster25.png",
+  monster26: "images/monster/monster26.png",
+  monster27: "images/monster/monster27.png",
+  monster28: "images/monster/monster28.png",
+  monster29: "images/monster/monster29.png",
+  monster30: "images/monster/monster30.png",
+  monster31: "images/monster/monster31.png",
+  monster32: "images/monster/monster32.png",
+  monster33: "images/monster/monster33.png",
+  monster34: "images/monster/monster34.png",
+  monster35: "images/monster/monster35.png",
+  monster36: "images/monster/monster36.png",
+  monster37: "images/monster/monster37.png",
+  monster38: "images/monster/monster38.png",
+  monster39: "images/monster/monster39.png",
+  monster40: "images/monster/monster40.png"
+};
+const CUSTOM_MAPS = null;
+let loadedImages = {};
+
+const AUDIO_ASSETS = {
+  BGM: {
+    title: 'audio/bgm_title.mp3',
+    field: 'audio/bgm_field.mp3',
+    town: 'audio/bgm_town.mp3',   
+    castle: 'audio/bgm_castle.mp3', 
+    cave: 'audio/bgm_cave.mp3',   
+    battle: 'audio/bgm_battle.mp3',
+    boss: 'audio/bgm_boss.mp3',
+    victory: 'audio/bgm_win.mp3',
+    death: 'audio/bgm_death.mp3' 
+  },
+  SE: {
+    ok: 'audio/se_ok.mp3',
+    cancel: 'audio/se_cancel.mp3',
+    attack: 'audio/se_attack.mp3',
+    damage: 'audio/se_damage.mp3',
+    magic: 'audio/se_magic.mp3',
+    item: 'audio/se_item.mp3',
+    miss: 'audio/se_miss.mp3', 
+    levelup: 'audio/se_levelup.mp3', 
+    warp: 'audio/se_warp.mp3', 
+    inn: 'audio/se_inn.mp3' 
+  }
+};
+
+let currentBGM = null;
+let currentBGMName = null;
+
+function playBGM(bgmName, isLoop = true) { // 変更: 第2引数でループ指定(初期値true)
+  if (currentBGMName === bgmName && currentBGM && !currentBGM.paused) return;
+  stopBGM();
+  if (AUDIO_ASSETS.BGM[bgmName]) {
+    currentBGM = new Audio(AUDIO_ASSETS.BGM[bgmName]);
+    currentBGM.loop = isLoop;  // 変更: 引数に従ってループ設定を適用
+    currentBGM.volume = 0.4;
+    currentBGM.play().catch(e => console.warn("BGM再生待機中"));
+    currentBGMName = bgmName;
+  }
+}
+// BGMを停止する関数
+function stopBGM() {
+  if (currentBGM) {
+    currentBGM.pause();
+    currentBGM.currentTime = 0;
+    currentBGM = null;
+    currentBGMName = null;
+  }
+}
+
+// SE（効果音）を再生する関数
+function playSE(seName) {
+  if (AUDIO_ASSETS.SE[seName]) {
+    // 連続で鳴らせるように、毎回新しい音声オブジェクトを作る
+    let se = new Audio(AUDIO_ASSETS.SE[seName]);
+    se.volume = 0.6; // SEの音量 (0.0 〜 1.0)
+    se.play().catch(e => {}); 
+  }
+}
+
+ // マップの情報をもとにBGMを切り替える関数を追加
+function playFieldBGM() {
+  const mapObj = mapsData[currentMapId];
+  // マップデータに固有の bgm プロパティが設定されている場合はそれを優先
+  if (mapObj && mapObj.bgm) {
+    playBGM(mapObj.bgm);
+  } else {
+    // 固有の指定がない場合は、マップID(名前)からBGMを自動推測
+    if (currentMapId.includes('town')) {
+      playBGM('town');
+    } else if (currentMapId.includes('castle')) {
+      playBGM('castle');
+    } else if (currentMapId.includes('cave')) {
+      playBGM('cave');
+    } else {
+      // 該当しない場合はデフォルトのフィールドBGM
+      playBGM('field');
+    }
+  }
+}
+
+const ENEMY_DB = {
+  "スライム": { imgKey: "monster01",hp: 3, mp: 0, atk: 5, def: 3, agi: 2, fleeRate: 0, exp: 1, gold: 2, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき", "逃げる"] },
+  "スライムベス": { imgKey: "monster02",hp: 4, mp: 0, atk: 7, def: 3, agi: 4, fleeRate: 0, exp: 2, gold: 4, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき", "逃げる"] },
+  "メタルスライム": { imgKey: "monster03",hp: 4, mp: 6, atk: 18, def: 254, agi: 153, fleeRate: 0, exp: 775, gold: 6, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.0, sealResist: 0.0, confuseResist: 0.0, actions: ["こうげき", "ギラ", "逃げる"] },
+  "ドラキー": { imgKey: "monster04",hp: 6, mp: 0, atk: 9, def: 6, agi: 5, fleeRate: 0, exp: 3, gold: 6, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき"] },
+  "メイジドラキー": { imgKey: "monster05",hp: 15, mp: 8, atk: 13, def: 13, agi: 8, fleeRate: 0, exp: 12, gold: 20, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 1.0, confuseResist: 1.0, actions: ["こうげき", "ギラ"] },
+  "ドラキーマ": { imgKey: "monster06",hp: 20, mp: 10, atk: 22, def: 26, agi: 16, fleeRate: 0, exp: 20, gold: 25, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 1.0, confuseResist: 1.0, actions: ["こうげき", "ホイミ", "ギラ", "逃げる"] },
+  "ゴースト": { imgKey: "monster07",hp: 7, mp: 0, atk: 11, def: 8, agi: 6, fleeRate: 0, exp: 4, gold: 8, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき"] },
+  "メトロゴースト": { imgKey: "monster08",hp: 23, mp: 10, atk: 18, def: 20, agi: 14, fleeRate: 0, exp: 15, gold: 19, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 1.0, confuseResist: 1.0, actions: ["こうげき", "ギラ", "逃げる"] },
+  "ヘルゴースト": { imgKey: "monster09",hp: 33, mp: 14, atk: 40, def: 38, agi: 26, fleeRate: 0, exp: 47, gold: 72, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.4, sealResist: 1.0, confuseResist: 0.4, actions: ["こうげき", "ギラ", "ラリホー", "マホトーン", "逃げる"] },
+  "まほうつかい": { imgKey: "monster10",hp: 12, mp: 8, atk: 8, def: 12, agi: 6, fleeRate: 0, exp: 8, gold: 16, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 1.0, confuseResist: 1.0, actions: ["こうげき", "ギラ", "逃げる"] },
+  "まどうし": { imgKey: "monster11",hp: 28, mp: 10, atk: 26, def: 24, agi: 15, fleeRate: 0, exp: 28, gold: 50, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 1.0, confuseResist: 1.0, actions: ["こうげき", "ギラ", "ラリホー", "逃げる"] },
+  "だいまどう": { imgKey: "monster12",hp: 70, mp: 16, atk: 71, def: 60, agi: 49, fleeRate: 0, exp: 120, gold: 185, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.0, sealResist: 0.6, confuseResist: 0.5, actions: ["こうげき", "マホトーン", "ベギラマ", "逃げる"] },
+  "メーダ": { imgKey: "monster13",hp: 22, mp: 0, atk: 20, def: 18, agi: 11, fleeRate: 0, exp: 14, gold: 21, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき", "逃げる"] },
+  "メーダロード": { imgKey: "monster14",hp: 35, mp: 30, atk: 41, def: 40, agi: 28, fleeRate: 0, exp: 58, gold: 95, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.0, sealResist: 1.0, confuseResist: 0.5, actions: ["こうげき", "ホイミ", "ギラ"] },
+  "おおさそり": { imgKey: "monster15",hp: 15, mp: 0, atk: 18, def: 35, agi: 4, fleeRate: 0, exp: 16, gold: 25, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき"] },
+  "てつのさそり": { imgKey: "monster16",hp: 22, mp: 0, atk: 36, def: 60, agi: 25, fleeRate: 0, exp: 31, gold: 48, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき"] },
+  "しのさそり": { imgKey: "monster17",hp: 35, mp: 0, atk: 55, def: 90, agi: 33, fleeRate: 0, exp: 70, gold: 110, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.5, sealResist: 0.0, confuseResist: 0.5, actions: ["こうげき", "逃げる"] },
+  "ドロル": { imgKey: "monster18",hp: 35, mp: 0, atk: 24, def: 6, agi: 9, fleeRate: 0, exp: 18, gold: 30, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき"] },
+  "ドロルメイジ": { imgKey: "monster19",hp: 55, mp: 10, atk: 44, def: 16, agi: 11, fleeRate: 0, exp: 58, gold: 110, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.8, sealResist: 1.0, confuseResist: 0.7, actions: ["こうげき", "ラリホー", "逃げる"] },
+  "がいこつ": { imgKey: "monster20",hp: 30, mp: 0, atk: 28, def: 22, agi: 17, fleeRate: 0, exp: 25, gold: 42, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき"] },
+  "しりょう": { imgKey: "monster21",hp: 36, mp: 9, atk: 44, def: 34, agi: 23, fleeRate: 0, exp: 42, gold: 62, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 1.0, confuseResist: 1.0, actions: ["こうげき", "ホイミ"] },
+  "しりょうのきし": { imgKey: "monster22",hp: 46, mp: 12, atk: 62, def: 46, agi: 36, fleeRate: 0, exp: 72, gold: 120, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.2, sealResist: 1.0, confuseResist: 0.6, actions: ["こうげき", "ホイミ", "逃げる"] },
+  "かげのきし": { imgKey: "monster23",hp: 43, mp: 0, atk: 79, def: 51, agi: 40, fleeRate: 0, exp: 90, gold: 148, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.3, sealResist: 0.0, confuseResist: 0.4, actions: ["こうげき", "逃げる"] },
+  "リカント": { imgKey: "monster24",hp: 34, mp: 0, atk: 40, def: 30, agi: 21, fleeRate: 0, exp: 40, gold: 60, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき"] },
+  "リカントマムル": { imgKey: "monster25",hp: 38, mp: 6, atk: 50, def: 36, agi: 23, fleeRate: 0, exp: 52, gold: 80, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 1.0, confuseResist: 1.0, actions: ["こうげき", "マホトーン"] },
+  "キラーリカント": { imgKey: "monster26",hp: 60, mp: 0, atk: 80, def: 65, agi: 45, fleeRate: 0, exp: 95, gold: 155, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき"] },
+  "ゴールドマン": { imgKey: "monster27",hp: 99, mp: 0, atk: 48, def: 30, agi: 26, fleeRate: 0, exp: 6, gold: 650, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.3, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき", "逃げる"] },
+  "ストーンマン": { imgKey: "monster28",hp: 160, mp: 0, atk: 100, def: 40, agi: 40, fleeRate: 0, exp: 155, gold: 148, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.8, sealResist: 0.0, confuseResist: 0.0, actions: ["こうげき"] },
+  "キメラ": { imgKey: "monster29",hp: 42, mp: 0, atk: 56, def: 48, agi: 31, fleeRate: 0, exp: 64, gold: 105, dropItem: "やくそう", dropRate: 0.1, sleepResist: 1.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき", "逃げる"] },
+  "メイジキメラ": { imgKey: "monster30",hp: 50, mp: 12, atk: 68, def: 62, agi: 44, fleeRate: 0, exp: 83, gold: 135, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.8, sealResist: 0.8, confuseResist: 1.0, actions: ["こうげき", "ホイミ", "ラリホー"] },
+  "スターキメラ": { imgKey: "monster31",hp: 73, mp: 15, atk: 82, def: 65, agi: 52, fleeRate: 0, exp: 105, gold: 169, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.8, sealResist: 1.0, confuseResist: 0.0, actions: ["こうげき", "火の息", "ベホイミ"] },
+  "よろいのきし": { imgKey: "monster32",hp: 55, mp: 6, atk: 70, def: 71, agi: 45, fleeRate: 0, exp: 78, gold: 150, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.8, sealResist: 0.7, confuseResist: 1.0, actions: ["こうげき", "マホトーン"] },
+  "あくまのきし": { imgKey: "monster33",hp: 79, mp: 4, atk: 94, def: 92, agi: 53, fleeRate: 0, exp: 130, gold: 165, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.0, sealResist: 1.0, confuseResist: 0.8, actions: ["こうげき", "ラリホー"] },
+  "しにがみのきし": { imgKey: "monster34",hp: 95, mp: 14, atk: 105, def: 99, agi: 57, fleeRate: 0, exp: 172, gold: 152, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.0, sealResist: 0.0, confuseResist: 1.0, actions: ["こうげき", "ベホイミ", "ベギラマ"] },
+  "ドラゴン": { imgKey: "monster35",hp: 153, mp: 0, atk: 58, def: 72, agi: 35, fleeRate: 0, exp: 950, gold: 250, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.0, sealResist: 0.0, confuseResist: 0.7, actions: ["こうげき", "火の息"] },
+  "キースドラゴン": { imgKey: "monster36",hp: 98, mp: 0, atk: 98, def: 80, agi: 52, fleeRate: 0, exp: 180, gold: 150, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.3, sealResist: 0.0, confuseResist: 0.3, actions: ["こうげき", "火の息"] },
+  "ダースドラゴン": { imgKey: "monster37",hp: 105, mp: 3, atk: 115, def: 104, agi: 62, fleeRate: 0, exp: 350, gold: 143, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.2, sealResist: 1.0, confuseResist: 0.0, actions: ["こうげき", "火の息", "マホトーン"] },
+  "ゴーレム": { imgKey: "monster38",hp: 155, mp: 0, atk: 120, def: 60, agi: 39, fleeRate: 0, exp: 2500, gold: 10, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.6, sealResist: 0.0, confuseResist: 0.4, actions: ["こうげき"] },
+  "りゅうおう": { imgKey: "monster39",hp: 240, mp: 40, atk: 107, def: 110, agi: 55, fleeRate: 0, exp: 0, gold: 0, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.0, sealResist: 0.0, confuseResist: 0.3, actions: ["こうげき", "ラリホー", "ベギラマ", "ベホイミ"] },
+  "竜王": { imgKey: "monster40",hp: 350, mp: 0, atk: 130, def: 150, agi: 90, fleeRate: 0, exp: 0, gold: 0, dropItem: "やくそう", dropRate: 0.1, sleepResist: 0.0, sealResist: 0.0, confuseResist: 0.5, actions: ["こうげき", "火の息", "火炎の息", "激しい炎"] }
+};
+
+const TILE_DB = {
+  0: { name: "平地", passable: true,  color: "#ccc", label: "平地" },
+  1: { name: "森林", passable: true,  color: "#ccc", label: "森林" },
+  2: { name: "岩場", passable: true,  color: "#ccc", label: "岩場" },
+  3: { name: "山",   passable: false, color: "#333", label: "山" },
+  4: { name: "海",   passable: false, color: "#0055aa", label: "海" },
+  5: { name: "町",   passable: true,  color: "#ff8c00", label: "町" },
+  6: { name: "城1",   passable: true,  color: "#aaaaaa", label: "城" },
+  7: { name: "城2",   passable: true,  color: "#aaaaaa", label: "城" },
+  8: { name: "城3",   passable: true,  color: "#aaaaaa", label: "城" },
+  9: { name: "城4",   passable: true,  color: "#aaaaaa", label: "城" },
+  10: { name: "洞窟", passable: true,  color: "#555555", label: "洞" },
+  11: { name: "上り階段", passable: true, color: "#888", label: "上" },
+  12: { name: "下り階段", passable: true, color: "#888", label: "下" },
+  13: { name: "壁",   passable: false, color: "#666", label: "壁" },
+  14: { name: "毒沼", passable: true,  color: "#800080", label: "毒", damage: 1 },
+  15: { name: "城床",   passable: true, color: "#666", label: "城床" },
+  16: { name: "洞床",   passable: true, color: "#666", label: "洞床" },
+  17: { name: "痛床",   passable: true, color: "#666", label: "痛床" },
+  18: { name: "扉",   passable: false, color: "#666", label: "扉" },
+  19: { name: "扉青",   passable: false, color: "#666", label: "扉青" },
+  20: { name: "扉赤",   passable: false, color: "#666", label: "扉赤" }
+};
+
+const NPC_DB = {
+  talk:        { imgKey: "npc",  label: "人", color: "#27ae60" },
+  king:        { imgKey: "king", label: "王", color: "#f1c40f" },
+  weapon_shop: { imgKey: "shop", label: "武", color: "#f39c12" },
+  armor_shop:  { imgKey: "shop", label: "防", color: "#f39c12" },
+  item_shop:   { imgKey: "shop", label: "道", color: "#f39c12" },
+  inn:         { imgKey: "shop", label: "宿", color: "#3498db" },
+  choice:      { imgKey: "npc",  label: "選", color: "#9b59b6" },
+  battle:      { imgKey: "npc",  label: "戦", color: "#e74c3c" },
+  treasure:    { imgKey: "treasure", isObject: true, label: "宝", color: "#f1c40f", openedLabel: "空", openedColor: "#7f8c8d" },
+  pot:         { imgKey: "pot", isObject: true, label: "壷", color: "#d35400", openedLabel: "砕", openedColor: "#7f8c8d" },
+  barrel:      { imgKey: "barrel", isObject: true, label: "樽", color: "#e67e22", openedLabel: "砕", openedColor: "#7f8c8d" }
+};
+
+const ITEM_DB = {
+  "やくそう": { name: "やくそう", type: "heal", val: 20, price: 8, sellPrice:4 },
+  "どくけしそう": { name: "どくけしそう", type: "cure", val: 0, price: 10, sellPrice:5 },
+  "いのちのきのみ": { name: "いのちのきのみ", type: "seed", stat: "maxHp", price: 0, sellPrice:200 },
+  "ふしぎなきのみ": { name: "ふしぎなきのみ", type: "seed", stat: "maxMp", price: 0, sellPrice:200 },
+  "ちからのたね": { name: "ちからのたね", type: "seed", stat: "str", price: 0, sellPrice:200 },
+  "まもりのたね": { name: "まもりのたね", type: "seed", stat: "def", price: 0, sellPrice:200 },
+  "かしこさのたね": { name: "かしこさのたね", type: "seed", stat: "int", price: 0, sellPrice:200 },
+  "すばやさのたね": { name: "すばやさのたね", type: "seed", stat: "agi", price: 0, sellPrice:200 },
+  "きせきのたね": { name: "きせきのたね", type: "seed", stat: "luck", price: 0, sellPrice:200 },
+  "たけざお": { name: "たけざお", type: "weapon", atk: 2, price: 10, sellPrice:5 },
+  "こんぼう": { name: "こんぼう", type: "weapon", atk: 4, price: 60, sellPrice:30 },
+  "どうのつるぎ": { name: "どうのつるぎ", type: "weapon", atk: 10, price: 180, sellPrice:90 },
+  "てつのおの": { name: "てつのおの", type: "weapon", atk: 15, price: 560, sellPrice:280 },
+  "はがねのつるぎ": { name: "はがねのつるぎ", type: "weapon", atk: 20, price: 1500, sellPrice:750 },
+  "ほのおのつるぎ": { name: "ほのおのつるぎ", type: "weapon", atk: 28, price: 9800, sellPrice:4900 },
+  "ロトのつるぎ": { name: "ロトのつるぎ", type: "weapon", atk: 40, price: 0, sellPrice:0 },
+  "ぬののふく": { name: "ぬののふく", type: "armor", def: 2, price: 20, sellPrice:10 },
+  "かわのよろい": { name: "かわのよろい", type: "armor", def: 4, price: 70, sellPrice:35 },
+  "くさりかたびら": { name: "くさりかたびら", type: "armor", def: 10, price: 300, sellPrice:150 },
+  "てつのよろい": { name: "てつのよろい", type: "armor", def: 16, price: 1000, sellPrice:500 },
+  "はがねのよろい": { name: "はがねのよろい", type: "armor", def: 24, price: 3000, sellPrice:1500 },
+  "まほうのよろい": { name: "まほうのよろい", type: "armor", def: 24, price: 7700, sellPrice:3850 },
+  "ロトのよろい": { name: "ロトのよろい", type: "armor", def: 28, price: 0, sellPrice:0 },
+  "おなべのふた": { name: "おなべのふた", type: "shield", def: 2, price: 20, sellPrice:10 },
+  "かわのたて": { name: "かわのたて", type: "shield", def: 4, price: 70, sellPrice:35 },
+  "うろこのたて": { name: "うろこのたて", type: "shield", def: 7, price: 170, sellPrice:85 },
+  "てつのたて": { name: "てつのたて", type: "shield", def: 12, price: 400, sellPrice:200 },
+  "はがねのたて": { name: "はがねのたて", type: "shield", def: 18, price: 1200, sellPrice:600 },
+  "みかがみのたて": { name: "みかがみのたて", type: "shield", def: 20, price: 7500, sellPrice:3750 },
+  "ロトのたて": { name: "ロトのたて", type: "shield", def: 22, price: 0, sellPrice:0 },
+  "ぬののぼうし": { name: "ぬののぼうし", type: "helmet", def: 2, price: 15, sellPrice:8 },
+  "かわのぼうし": { name: "かわのぼうし", type: "helmet", def: 4, price: 65, sellPrice:33 },
+  "うろこのかぶと": { name: "うろこのかぶと", type: "helmet", def: 6, price: 160, sellPrice:80 },
+  "てつのかぶと": { name: "てつのかぶと", type: "helmet", def: 9, price: 370, sellPrice:185 },
+  "はがねのかぶと": { name: "はがねのかぶと", type: "helmet", def: 12, price: 1000, sellPrice:500 },
+  "ちりょくのかぶと": { name: "ちりょくのかぶと", type: "helmet", def: 13, price: 6800, sellPrice:3400 },
+  "ロトのかぶと": { name: "ロトのかぶと", type: "helmet", def: 16, price: 0, sellPrice:0 },
+  "とうぞくのかぎ": { name: "とうぞくのかぎ", type: "key", price: 0, sellPrice: 0 },
+  "まほうのかぎ": { name: "まほうのかぎ", type: "key", price: 0, sellPrice: 0 },
+  "さいごのかぎ": { name: "さいごのかぎ", type: "key", price: 0, sellPrice: 0 }
+};
+
+const SPELL_DB = {
+  "ホイミ": { type: "heal", mp: 3, val: 30, text: "ＨＰが かいふくした！" },
+  "ベホイミ": { type: "heal", mp: 8, val: 90, text: "ＨＰが 大幅に かいふくした！" },
+  "ギラ": { type: "attack", mp: 2, val: 18, text: "のダメージ！" },
+  "ベギラマ": { type: "attack", mp: 5, val: 60, text: "のダメージ！" },
+  "火の息": { type: "attack", mp: 0, val: 16, text: "のダメージ！" },
+  "火炎の息": { type: "attack", mp: 0, val: 23, text: "のダメージ！" },
+  "激しい炎": { type: "attack", mp: 0, val: 72, text: "のダメージ！" },
+  "ラリホー": { type: "status", mp: 2, status: "sleep", val: 3, text: "は 眠ってしまった！" },
+  "マホトーン": { type: "status", mp: 2, status: "seal", val: 4, text: "の 呪文が 封じられた！" },
+  "メダパニ": { type: "status", mp: 5, status: "confuse", val: 3, text: "は 混乱してしまった！" },
+  "ヴェレ": { type: "status", mp: 2, status: "poison", val: 1, text: "は 毒におかされた！" },
+  "ルーラ": { type: "field", mp: 8 }
+  };
+
+const SPELL_LEARN_TABLE = {
+  3: ["ホイミ"],
+  4: ["ギラ"],
+  7: ["ラリホー"],
+  9: ["レミーラ"],
+  10: ["マホトーン"],
+  13: ["ルーラ"],
+  17: ["ベホイミ"],
+  19: ["ベギラマ"]
+};
+
+const GAME_STATE = { TITLE: 0, NAME_INPUT: 1, FIELD: 2, BATTLE: 3, MENU: 4, MESSAGE: 5, SHOP: 6, CONFIRM: 7 };
+let currentState = GAME_STATE.TITLE;
+let isFading = false;
+const TILE_SIZE = 32;
+let mapsData = {}; let currentMapId = "world";
+let player = {}; let rulaTargets = [];
+
+const NEXT_EXP = [0, 10, 30, 70, 150, 300, 600, 1000];
+for(let i = 8; i < 99; i++) { NEXT_EXP[i] = NEXT_EXP[i-1] + (i * 100); }
+
+function getPlayerAtk() { return player.str + (player.equipment.weapon ? player.equipment.weapon.atk : 0); }
+function getPlayerDef() { return player.def + (player.equipment.armor ? player.equipment.armor.def : 0) + (player.equipment.shield ? player.equipment.shield.def : 0) + (player.equipment.helmet ? player.equipment.helmet.def : 0); }
+function pushToInventory(item) { if(!item) return; const ex = player.inventory.find(i => i.name === item.name); if(ex) ex.count++; else player.inventory.push({ ...item, count: 1 }); }
+
+let currentEnemy = null; let battleMenuState = 'main'; 
+let uiSelections = { title: 0, battle: 0, battleSub: 0, menuMain: 0 };
+let menuState = 'main'; let menuIndices = { equipTab: 0, equipList: 0, itemList: 0, itemAction: 0, magicList: 0, rulaList: 0 };
+let selectedItemIndex = 0; let filteredItems = []; let useItemCount = 1;
+const EQUIP_TYPES = ['weapon', 'shield', 'helmet', 'armor']; const EQUIP_NAMES = ['ぶき', 'たて', 'かぶと', 'よろい'];
+
+const canvas = document.getElementById("game-canvas"); const ctx = canvas.getContext("2d");
+canvas.width = 320; canvas.height = 320;
+
+function preloadImagesAndInit() {
+  const custom = JSON.parse(localStorage.getItem('rpg_custom_images')||'{}');
+  Object.assign(IMAGE_PATHS, custom);
+  
+  let loaded = 0; const keys = Object.keys(IMAGE_PATHS);
+  if(keys.length === 0) return initGame();
+  keys.forEach(key => {
+    const img = new Image();
+    img.onload = () => { img.isLoaded = true; loaded++; if(loaded === keys.length) initGame(); };
+    img.onerror = () => { img.isLoaded = false; loaded++; if(loaded === keys.length) initGame(); };
+    img.src = IMAGE_PATHS[key]; loadedImages[key] = img;
+  });
+}
+
+function initGame() { 
+  resetPlayer(); 
+  // updateScreen() ではなく switchState() を呼ぶことで、
+  // 内部に組み込まれている playBGM('title') が発火します。
+  switchState(GAME_STATE.TITLE); 
+}
+
+// ▼ 追加：ブラウザの自動再生ブロック対策
+// 画面のどこかをクリック/タップ、またはキーを押した最初の1回だけ、BGMの再生を試みます。
+const resumeAudioContext = () => {
+  if (currentBGM && currentBGM.paused) {
+    currentBGM.play().catch(e => console.warn("BGM再生エラー:", e));
+  }
+};
+document.addEventListener('pointerdown', resumeAudioContext, { once: true });
+document.addEventListener('keydown', resumeAudioContext, { once: true });
+
+function generateMap() {
+  if (CUSTOM_MAPS && Object.keys(CUSTOM_MAPS).length > 0) {
+    mapsData = CUSTOM_MAPS;
+  } else {
+    mapsData = { "world": { width: 40, height: 40, encounter: true, data: [], events: {}, npcs: {} }, "town": { width: 15, height: 15, encounter: false, data: [], events: {}, npcs: {} } };
+    for(let y=0; y<40; y++){ let r=[]; for(let x=0; x<40; x++){ r.push((x===0||y===0||x===39||y===39)?2:(Math.random()<0.1?1:0)); } mapsData["world"].data.push(r); }
+    mapsData["world"].data[20][20] = 3; mapsData["world"].events[`20,20`] = { targetMap: "town", targetX: 7, targetY: 13 };
+    for(let y=0; y<15; y++){ let r=[]; for(let x=0; x<15; x++) { r.push((x===0||y===0||x===14||y===14)?8:0); } mapsData["town"].data.push(r); }
+    mapsData["town"].data[11][5] = 9; mapsData["town"].data[11][6] = 9; mapsData["town"].data[12][6] = 9;
+    
+    mapsData["town"].events[`7,14`] = { targetMap: "world", targetX: 20, targetY: 21 };
+    mapsData["town"].npcs[`7,6`] = { type: "king", text: "勇者よ、よくぞ戻ってきた。\\n健闘を祈るぞ！---さあ、行くがよい！" };
+    mapsData["town"].npcs[`5,5`] = { type: "weapon_shop", text: "武器屋だよ。", items: ["たけざお", "こんぼう"] };
+    mapsData["town"].npcs[`9,5`] = { type: "inn", text: "旅の宿屋へようこそ。", price: 10 };
+    mapsData["town"].npcs[`3,3`] = { type: "treasure", item: "いのちのきのみ" };
+  }
+}
+
+function getSpawnPoint() {
+  for (const mId in mapsData) {
+    const npcs = mapsData[mId].npcs;
+    for (const key in npcs) {
+      if (npcs[key].type === 'king') {
+        const [x, y] = key.split(',').map(Number);
+        const spawnY = (y + 1 < mapsData[mId].height) ? y + 1 : y;
+        return { mapId: mId, x: x, y: spawnY };
+      }
+    }
+  }
+  return { mapId: Object.keys(mapsData)[0], x: Math.floor(mapsData[Object.keys(mapsData)[0]].width/2), y: Math.floor(mapsData[Object.keys(mapsData)[0]].height/2) };
+}
+
+function getSafeWarpPos(mapId, tx, ty) {
+    const map = mapsData[mapId];
+    if(!map) return {x: tx, y: ty};
+    const dirs = [[0,1], [0,-1], [-1,0], [1,0]];
+    for(let [dx, dy] of dirs) {
+        let nx = tx + dx, ny = ty + dy;
+        if(nx>=0 && nx<map.width && ny>=0 && ny<map.height) {
+            let t = map.data[ny][nx]; let info = TILE_DB[t];
+            if(info && info.passable && !map.events[`${nx},${ny}`]) return {x: nx, y: ny};
+        }
+    }
+    return {x: tx, y: ty};
+}
+
+function getRulaTargets() {
+    let targets = []; let seen = new Set();
+    for (let mId in mapsData) {
+        let map = mapsData[mId];
+        for (let key in map.events) {
+            let ev = map.events[key];
+            let [ex, ey] = key.split(',').map(Number);
+            let tile = map.data[ey][ex];
+            if (tile === 3 || tile === 4 || tile === 5) {
+                let tName = tile === 3 ? "町" : (tile === 4 ? "城" : "洞窟");
+                let dispName = `${tName} (${ev.targetMap})`;
+                if (!seen.has(dispName)) {
+                    let wp = getSafeWarpPos(mId, ex, ey);
+                    targets.push({ name: dispName, mapId: mId, x: wp.x, y: wp.y });
+                    seen.add(dispName);
+                }
+            }
+        }
+    }
+    return targets;
+}
+
+function resetPlayer() {
+  generateMap();
+  const spawn = getSpawnPoint();
+  currentMapId = spawn.mapId;
+  player = {
+    name: "", level: 1, exp: 0, gold: 100, hp: 20, maxHp: 20, mp: 5, maxMp: 5,
+    str: 5, def: 5, agi: 5, int: 5, luck: 5, x: spawn.x, y: spawn.y, dir: 'down', stepCount: 0,
+    // ▼ スプレッド構文(...)を使ってITEM_DBから直接データを展開し、countを付与するよう変更
+    equipment: { 
+      weapon: { ...ITEM_DB["たけざお"], count: 1 }, 
+      shield: null, 
+      helmet: null, 
+      armor: { ...ITEM_DB["ぬののふく"], count: 1 } 
+    },
+    // ▼ やくそうも同様に変更
+    inventory: [ { ...ITEM_DB["やくそう"], count: 3 } ],
+    spells: [], opened: [],
+    status: { poison: false, sleep: 0, confuse: 0, seal: 0 }
+  };
+}
+
+function switchState(newState) {
+  document.querySelectorAll('.screen').forEach(el => el.classList.remove('active'));
+  currentState = newState;
+  
+  // ★追加: 状態に応じたBGMの再生
+  if (newState === GAME_STATE.TITLE) { 
+    playBGM('title'); 
+  } else if ([GAME_STATE.FIELD, GAME_STATE.MESSAGE, GAME_STATE.SHOP, GAME_STATE.CONFIRM, GAME_STATE.MENU].includes(newState)) {
+    // 固定の'field'ではなく、現在いるマップに応じたBGMを流す
+    playFieldBGM();
+  }
+
+  if (newState === GAME_STATE.TITLE) { document.getElementById('title-screen').classList.add('active'); updateScreen(); }
+  if (newState === GAME_STATE.NAME_INPUT) document.getElementById('name-input-screen').classList.add('active');
+  if ([GAME_STATE.FIELD, GAME_STATE.MESSAGE, GAME_STATE.SHOP, GAME_STATE.CONFIRM].includes(newState)) { document.getElementById('field-screen').classList.add('active'); drawField(); }
+  // ...以降省略...
+  if (newState === GAME_STATE.BATTLE) document.getElementById('battle-screen').classList.add('active');
+  if (newState === GAME_STATE.MENU) { document.getElementById('menu-screen').classList.add('active'); updateMenuUI(); }
+}
+
+function updateScreen() {
+  if (currentState === GAME_STATE.TITLE) {
+    const hasData = hasSaveData();
+    document.getElementById('ts-continue').style.display = hasData ? 'block' : 'none';
+    if (!hasData) uiSelections.title = 0;
+    document.getElementById('ts-new').classList.toggle('selected', uiSelections.title === 0);
+    document.getElementById('ts-continue').classList.toggle('selected', uiSelections.title === 1);
+  } else if (currentState === GAME_STATE.BATTLE) {
+    const cmds = document.getElementById('battle-commands').children;
+    for(let i=0; i<cmds.length; i++) cmds[i].classList.toggle('selected', i === uiSelections.battle);
+    const subWin = document.getElementById('battle-sub-window');
+    if (battleMenuState !== 'main' && battleMenuState !== 'end') { subWin.classList.remove('hidden'); updateBattleSubWindow(); } else { subWin.classList.add('hidden'); }
+  }
+}
+
+function updateBattleSubWindow() {
+  const subWin = document.getElementById('battle-sub-window'); subWin.innerHTML = '';
+  let list = battleMenuState === 'magic' ? player.spells : player.inventory.map(i => i.name + " x" + i.count);
+  if (list.length === 0) list = ["(なし)"];
+  list.forEach((name, index) => {
+    const div = document.createElement('div'); div.className = 'menu-item' + (index === uiSelections.battleSub && name !== "(なし)" ? ' selected' : '');
+    div.innerText = name; subWin.appendChild(div);
+  });
+}
+
+function drawField() {
+  if (![GAME_STATE.FIELD, GAME_STATE.MESSAGE, GAME_STATE.SHOP, GAME_STATE.CONFIRM].includes(currentState)) return;
+  const mapObj = mapsData[currentMapId];
+  const offsetX = player.x * TILE_SIZE - (canvas.width / 2) + (TILE_SIZE / 2);
+  const offsetY = player.y * TILE_SIZE - (canvas.height / 2) + (TILE_SIZE / 2);
+
+  ctx.fillStyle = "#000"; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let y = 0; y < mapObj.height; y++) {
+    for (let x = 0; x < mapObj.width; x++) {
+      const screenX = Math.floor(x * TILE_SIZE - offsetX);
+      const screenY = Math.floor(y * TILE_SIZE - offsetY);
+      if (screenX < -TILE_SIZE || screenX > canvas.width || screenY < -TILE_SIZE || screenY > canvas.height) continue;
+
+      const tile = mapObj.data[y][x];
+      const imgKey = 'tile_' + tile;
+      const tileInfo = TILE_DB[tile] || TILE_DB[0];
+      
+      // ▼ 修正: mapObj.baseData を mapObj.bgData に変更
+      let baseTileId = null;
+      if (mapObj.bgData && mapObj.bgData[y] && mapObj.bgData[y][x] !== undefined) {
+        // マップエディタで設定された下地タイルIDを取得（-1などで「下地なし」を表現可能）
+        baseTileId = mapObj.bgData[y][x];
+      } else if (tile !== 0 && tile !== 4 && tile !== 10) {
+        // 既存のマップデータ用のフォールバック（デフォルト下地: 平地）
+        baseTileId = 0; 
+      }
+
+      // 下地タイルが設定されており、かつ有効なIDの場合のみ描画
+      if (baseTileId !== null && baseTileId !== -1) {
+        const baseImgKey = 'tile_' + baseTileId;
+        const baseImg = loadedImages[baseImgKey];
+        const baseInfo = TILE_DB[baseTileId] || TILE_DB[0];
+
+        if (baseImg && baseImg.isLoaded) {
+          ctx.drawImage(baseImg, screenX, screenY, TILE_SIZE, TILE_SIZE);
+        } else {
+          ctx.fillStyle = baseInfo.color; 
+          ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+        }
+      }
+
+      if (loadedImages[imgKey] && loadedImages[imgKey].isLoaded) {
+        ctx.drawImage(loadedImages[imgKey], screenX, screenY, TILE_SIZE, TILE_SIZE);
+      } else {
+        ctx.fillStyle = tileInfo.color; ctx.fillRect(screenX, screenY, TILE_SIZE, TILE_SIZE);
+        if (tileInfo.label) { ctx.fillStyle = "#fff"; ctx.fillText(tileInfo.label, screenX+8, screenY+20); }
+        else { ctx.strokeStyle = "#444"; ctx.strokeRect(screenX, screenY, TILE_SIZE, TILE_SIZE); }
+      }
+
+      if (mapObj.npcs[`${x},${y}`]) {
+        const npc = mapObj.npcs[`${x},${y}`];
+        const objKey = `${currentMapId}_${x}_${y}`;
+        const isOpened = player.opened && player.opened.includes(objKey);
+        
+        const npcDef = NPC_DB[npc.type] || NPC_DB['talk'];
+
+        // ▼ 追加: オブジェクトかつ入手済み(開封済み)の場合はここでスキップし、非表示にする
+        if (npcDef.isObject && isOpened) {
+            continue; 
+        }
+
+        const targetImgKey = npc.imgKey || npcDef.imgKey;
+        const targetImg = targetImgKey ? loadedImages[targetImgKey] : null;
+
+        // ▼ 変更: !npcDef.isObject の条件を削除。画像があれば描画する。
+        if (targetImg && targetImg.isLoaded) {
+           ctx.drawImage(targetImg, screenX, screenY, TILE_SIZE, TILE_SIZE);
+        } else {
+           // 画像が見つからなかった場合の予備の図形描画
+           ctx.fillStyle = npcDef.color; 
+           if (npcDef.isObject) {
+               ctx.fillRect(screenX+4, screenY+4, TILE_SIZE-8, TILE_SIZE-8);
+               ctx.fillStyle = "#fff";
+           }
+           ctx.fillText(npcDef.label, screenX+8, screenY+20);
+        }
+      }
+    }
+  }
+
+  const px = canvas.width / 2 - TILE_SIZE / 2; const py = canvas.height / 2 - TILE_SIZE / 2;
+  if (loadedImages['player'] && loadedImages['player'].isLoaded) ctx.drawImage(loadedImages['player'], px, py, TILE_SIZE, TILE_SIZE);
+  else { ctx.fillStyle = "#fff"; ctx.fillRect(px+4, py+4, TILE_SIZE-8, TILE_SIZE-8); ctx.fillStyle = "#000"; ctx.fillText("勇", px+8, py+20); }
+}
+
+function handleDeath() {
+  stopBGM(); 
+  playBGM('death', false); // 追加: 敗北時のBGMを一度だけ流す
+
+
+  showMessage(["あなたは しんでしまった...\\n\\n目の前が まっくらになった。"], () => {
+
+    stopBGM();
+    player.gold = Math.floor(player.gold / 2);
+    player.hp = player.maxHp; player.mp = player.maxMp;
+    player.status = { poison: false, sleep: 0, confuse: 0, seal: 0 };
+    
+    const spawn = getSpawnPoint();
+    currentMapId = spawn.mapId; player.x = spawn.x; player.y = spawn.y; player.dir = 'down';
+    
+    switchState(GAME_STATE.FIELD);
+
+    showMessage("王様「おお " + player.name + " よ！\\n死んでしまうとは なにごとだ！」");
+  });
+}
+
+function movePlayer(dx, dy, dirStr) {
+  if (currentState !== GAME_STATE.FIELD || isFading) return;
+  player.dir = dirStr;
+  const mapObj = mapsData[currentMapId];
+  const newX = player.x + dx; const newY = player.y + dy;
+
+  if (newX >= 0 && newX < mapObj.width && newY >= 0 && newY < mapObj.height) {
+    const tile = mapObj.data[newY][newX];
+    const tileInfo = TILE_DB[tile] || TILE_DB[0];
+    
+    // ▼ 変更箇所：NPCやオブジェクトの障害物判定
+    const npc = mapObj.npcs[`${newX},${newY}`];
+    let npcObstacle = !!npc; // 基本はNPCがいれば通行不可
+    
+    if (npc) {
+      const npcDef = NPC_DB[npc.type] || NPC_DB['talk'];
+      const objKey = `${currentMapId}_${newX}_${newY}`;
+      const isOpened = player.opened && player.opened.includes(objKey);
+      
+      // オブジェクト（宝箱・壺・樽など）であり、かつ開封済みの場合は通行可能にする
+      if (npcDef.isObject && isOpened) {
+        npcObstacle = false;
+      }
+    }
+    
+    const isObstacle = !tileInfo.passable || npcObstacle;
+    // ▲ 変更箇所ここまで
+    
+    if (!isObstacle) {
+      player.x = newX; player.y = newY; player.stepCount++;
+      
+      if (mapObj.events[`${newX},${newY}`]) {
+        const ev = mapObj.events[`${newX},${newY}`];
+        if (mapsData[ev.targetMap]) { 
+          playSE('warp'); // 追加: ワープ移動時の音を鳴らす
+          isFading = true;
+          document.getElementById('fade-overlay').classList.add('active');
+          setTimeout(() => {
+            currentMapId = ev.targetMap; 
+            player.x = ev.targetX; 
+            player.y = ev.targetY; 
+            drawField(); 
+            playFieldBGM(); // 追加: マップ移動後に新しいマップのBGMに切り替える
+            document.getElementById('fade-overlay').classList.remove('active');
+            setTimeout(() => { isFading = false; }, 500); 
+          }, 500);
+        }
+        return; 
+      }
+      
+      drawField();
+
+      if (tileInfo.damage) {
+        player.hp = Math.max(0, player.hp - tileInfo.damage);
+        playSE('damage');
+        const display = document.getElementById('game-display');
+        display.classList.remove('anim-damage'); void display.offsetWidth; display.classList.add('anim-damage');
+        if (player.hp <= 0) { setTimeout(() => handleDeath(), 500); return; }
+      }
+
+      if (player.status && player.status.poison) {
+         player.hp = Math.max(0, player.hp - 1);
+         playSE('damage');
+         const display = document.getElementById('game-display');
+         display.classList.remove('anim-damage'); void display.offsetWidth; display.classList.add('anim-damage');
+         if (player.hp <= 0) { setTimeout(() => handleDeath(), 500); return; }
+      }
+      
+      const encEnabled = mapObj.encounter !== undefined ? mapObj.encounter : (currentMapId.includes('world') || currentMapId.includes('cave'));
+      if (encEnabled && player.stepCount > 5 && Math.random() < 0.1) startBattle();
+      
+    } else { drawField(); }
+  }
+}
+
+let messageCallback = null;
+let messageQueue = [];
+
+function showMessage(msg, callback = null) {
+  if (Array.isArray(msg)) messageQueue = [...msg];
+  else messageQueue = msg.split('---').map(s => s.trim());
+  messageCallback = callback;
+  displayNextMessage();
+}
+
+function displayNextMessage() {
+  if (messageQueue.length > 0) {
+    const nextMsg = messageQueue.shift();
+    document.getElementById('message-text').innerHTML = nextMsg.replace(/\\n|\n/g, '<br>');
+    document.getElementById('message-window').classList.add('active');
+    currentState = GAME_STATE.MESSAGE;
+  } else {
+    document.getElementById('message-window').classList.remove('active');
+    if (messageCallback) { const cb = messageCallback; messageCallback = null; cb(); }
+    else { switchState(GAME_STATE.FIELD); }
+  }
+}
+
+let confirmCallbackYes = null; let confirmCallbackNo = null; let confirmCursor = 0;
+function showConfirm(onYes, onNo = null, textYes = "はい", textNo = "いいえ") {
+  document.getElementById('confirm-window').classList.add('active'); currentState = GAME_STATE.CONFIRM; confirmCursor = 0; confirmCallbackYes = onYes; confirmCallbackNo = onNo;
+  document.getElementById('conf-yes').innerText = textYes; document.getElementById('conf-no').innerText = textNo; updateConfirmUI();
+}
+function updateConfirmUI() { document.getElementById('conf-yes').classList.toggle('selected', confirmCursor === 0); document.getElementById('conf-no').classList.toggle('selected', confirmCursor === 1); }
+
+let shopState = 'select'; // ★追加: 'select', 'buy', 'sell'
+let currentShopItems = []; let shopCursor = 0;
+
+function openShop(npc) {
+  document.getElementById('shop-window').classList.add('active'); currentState = GAME_STATE.SHOP;
+  document.getElementById('shop-msg').innerText = npc.text || "いらっしゃいませ。"; 
+  document.getElementById('shop-gold').innerText = player.gold;
+  currentShopItems = (npc.items || []).map(name => ITEM_DB[name] || { name: name, type: "heal", val: 10, price: 10 }).filter(i => i && (i.price !== 0 || i.type !== 'seed')); 
+  shopState = 'select'; // ★初期化
+  shopCursor = 0; 
+  updateShopUI();
+}
+
+function updateShopUI() {
+  document.getElementById('shop-gold').innerText = player.gold;
+  let html = '';
+  if (shopState === 'select') {
+    html += `<div class="menu-item${shopCursor === 0 ? ' selected' : ''}">かう</div>`;
+    html += `<div class="menu-item${shopCursor === 1 ? ' selected' : ''}">うる</div>`;
+    html += `<div class="menu-item${shopCursor === 2 ? ' selected' : ''}">やめる</div>`;
+  } else if (shopState === 'buy') {
+    if (currentShopItems.length === 0) { html = '<div>(品切れのようだ...)</div>'; } 
+    else {
+      currentShopItems.forEach((item, i) => { html += `<div class="menu-item${i === shopCursor ? ' selected' : ''}" style="display:flex;"><span style="flex:1;">${item.name}</span><span>${item.price} G</span></div>`; });
+      html += `<div class="menu-item${shopCursor === currentShopItems.length ? ' selected' : ''}">もどる</div>`;
+    }
+  } else if (shopState === 'sell') {
+    let sellableItems = player.inventory.filter(i => (i.price && i.price > 0) || (i.sellPrice !== undefined && i.sellPrice > 0));
+    if (sellableItems.length === 0) {
+      html += `<div>(売れるものが ないようだ...)</div>`;
+      html += `<div class="menu-item${shopCursor === 0 ? ' selected' : ''}">もどる</div>`;
+    } else {
+      sellableItems.forEach((item, i) => { 
+        let sellPrice = item.sellPrice !== undefined ? item.sellPrice : Math.floor((item.price || 0) / 2); // ★売値の計算
+        html += `<div class="menu-item${i === shopCursor ? ' selected' : ''}" style="display:flex;"><span style="flex:1;">${item.name} x${item.count}</span><span>${sellPrice} G</span></div>`; 
+      });
+      html += `<div class="menu-item${shopCursor === sellableItems.length ? ' selected' : ''}">もどる</div>`;
+    }
+  }
+  document.getElementById('shop-list').innerHTML = html;
+}
+function closeShop() { document.getElementById('shop-window').classList.remove('active'); switchState(GAME_STATE.FIELD); }
+
+function playBattleTransition(callback) {
+  const tCanvas = document.getElementById('transition-canvas');
+  tCanvas.style.display = 'block';
+  tCanvas.width = canvas.width; tCanvas.height = canvas.height;
+  const tCtx = tCanvas.getContext('2d');
+  
+  const cols = 16; const rows = 16;
+  const bw = tCanvas.width / cols; const bh = tCanvas.height / rows;
+  let blocks = [];
+  
+  let top = 0, bottom = rows - 1, left = 0, right = cols - 1;
+  while (top <= bottom && left <= right) {
+    for (let i = left; i <= right; i++) blocks.push({x: i, y: top}); top++;
+    for (let i = top; i <= bottom; i++) blocks.push({x: right, y: i}); right--;
+    if (top <= bottom) { for (let i = right; i >= left; i--) blocks.push({x: i, y: bottom}); bottom--; }
+    if (left <= right) { for (let i = bottom; i >= top; i--) blocks.push({x: left, y: i}); left++; }
+  }
+
+  let index = 0; tCtx.fillStyle = "#000";
+  
+  function drawFrame() {
+    let blocksPerFrame = 5;
+    for(let i = 0; i < blocksPerFrame; i++) {
+        if (index < blocks.length) {
+            let b = blocks[index];
+            tCtx.fillRect(Math.floor(b.x * bw), Math.floor(b.y * bh), Math.ceil(bw)+1, Math.ceil(bh)+1);
+            index++;
+        }
+    }
+    if (index < blocks.length) { requestAnimationFrame(drawFrame); } 
+    else {
+      setTimeout(() => {
+        callback();
+        tCanvas.style.display = 'none';
+        tCtx.clearRect(0,0, tCanvas.width, tCanvas.height);
+      }, 300);
+    }
+  }
+  drawFrame();
+}
+
+let isPlayerDefending = false;
+function startBattle() { 
+  const mapObj = mapsData[currentMapId];
+  let enemies = ["スライム", "スライムベス", "ドラキー"];
+  if (mapObj.encEnemies && mapObj.encEnemies.length > 0) {
+    enemies = mapObj.encEnemies;
+  }
+  const enemy = enemies[Math.floor(Math.random() * enemies.length)];
+  startEventBattle(enemy); 
+}
+
+function startEventBattle(enemyData, isConsecutive = false) { 
+  if (isFading && !isConsecutive) return;
+  isFading = true;
+
+  // ▼ 追加・変更箇所：トランジション開始前にBGMとSEを鳴らします
+  if (!isConsecutive) {
+    let eNameForBgm = "謎の敵";
+    if (typeof enemyData === 'object') {
+        eNameForBgm = enemyData.enemy || enemyData.value || eNameForBgm;
+    } else if (typeof enemyData === 'string') {
+        eNameForBgm = enemyData;
+    }
+
+    if (eNameForBgm.includes("りゅうおう") || eNameForBgm.includes("竜王")) {
+      playBGM('boss');
+    } else {
+      playBGM('battle');
+    }
+  }
+  // ▲ 追加・変更箇所ここまで
+
+  const initBattle = () => {
+    isFading = false;
+    switchState(GAME_STATE.BATTLE); 
+    if (!isConsecutive) player.stepCount = 0; 
+    isPlayerDefending = false; battleMenuState = 'main'; 
+    
+    const enemyImg = document.getElementById('enemy-img');
+    enemyImg.style.visibility = 'visible';
+    enemyImg.classList.remove('anim-blink', 'anim-critical'); 
+    document.getElementById('game-display').classList.remove('anim-damage'); 
+    
+    let eName = "謎の敵"; let hp=30, mp=0, atk=10, def=5, agi=5, fleeRate=0, exp=20, gold=50; let dropItem = null, dropRate = 0; let imgKey = null;
+    let sleepResist = 0.5, sealResist = 0.5, confuseResist = 0.5, actions = ["こうげき"];
+    let nextEnemyData = null; // ★追加: 第二形態データの保持用
+
+    const defaultEnemy = {
+      hp: 30, mp: 0, atk: 10, def: 5, agi: 5, fleeRate: 0, exp: 20, gold: 50,
+      dropItem: null, dropRate: 0, imgKey: null,
+      sleepResist: 0.5, sealResist: 0.5, confuseResist: 0.5, actions: ["こうげき"]
+    };
+    
+    if (typeof enemyData === 'object') {
+        eName = enemyData.enemy || enemyData.value || eName;
+        // ★変更: マップエディタで設定された第二形態の情報を取得（hasForm2プロパティに対応）
+        nextEnemyData = enemyData.nextEnemy || enemyData.nextForm || enemyData.secondForm || null;
+        if (!nextEnemyData && enemyData.hasForm2) {
+            nextEnemyData = {
+                enemy: enemyData.enemy2,
+                imgKey: enemyData.enemyImg2
+            };
+        } 
+        
+        if (enemyData.custom) { 
+          hp=enemyData.hp; mp=enemyData.mp||0; atk=enemyData.atk; def=enemyData.def||0; agi=enemyData.agi||0; fleeRate=enemyData.fleeRate||0; exp=enemyData.exp; gold=enemyData.gold; 
+          dropItem=enemyData.dropItem || null; dropRate=enemyData.dropRate || 0;
+          imgKey = enemyData.imgKey || null;
+          sleepResist = enemyData.sleepResist !== undefined ? enemyData.sleepResist : 0.5;
+          sealResist = enemyData.sealResist !== undefined ? enemyData.sealResist : 0.5;
+          confuseResist = enemyData.confuseResist !== undefined ? enemyData.confuseResist : 0.5;
+          actions = enemyData.actions || ["こうげき"];
+        } else {
+          let edb = ENEMY_DB[eName] || defaultEnemy;
+          hp = edb.hp; mp = edb.mp||0; atk = edb.atk; def = edb.def||0; agi = edb.agi||0; fleeRate = edb.fleeRate||0; exp = edb.exp; gold = edb.gold; dropItem = edb.dropItem; dropRate = edb.dropRate;
+          // ★変更: ENEMY_DBの画像だけでなく、NPC(enemyData)に直接設定された画像も適用できるようにする
+          imgKey = edb.imgKey || enemyData.imgKey || null;
+          sleepResist = edb.sleepResist !== undefined ? edb.sleepResist : 0.5;
+          sealResist = edb.sealResist !== undefined ? edb.sealResist : 0.5;
+          confuseResist = edb.confuseResist !== undefined ? edb.confuseResist : 0.5;
+          actions = edb.actions || ["こうげき"];
+        }
+    } else if (typeof enemyData === 'string') {
+        eName = enemyData;
+        let edb = ENEMY_DB[eName] || defaultEnemy;
+        hp = edb.hp; mp = edb.mp||0; atk = edb.atk; def = edb.def||0; agi = edb.agi||0; fleeRate = edb.fleeRate||0; exp = edb.exp; gold = edb.gold; dropItem = edb.dropItem; dropRate = edb.dropRate;
+        imgKey = edb.imgKey || null;
+        sleepResist = edb.sleepResist !== undefined ? edb.sleepResist : 0.5;
+        sealResist = edb.sealResist !== undefined ? edb.sealResist : 0.5;
+        confuseResist = edb.confuseResist !== undefined ? edb.confuseResist : 0.5;
+        actions = edb.actions || ["こうげき"];
+    }
+    
+    currentEnemy = { 
+      name: eName, hp: hp, maxHp: hp, mp: mp, attack: atk, def: def, agi: agi, fleeRate: fleeRate, 
+      exp: exp, gold: gold, dropItem: dropItem, dropRate: dropRate, 
+      sleepResist: sleepResist, sealResist: sealResist, confuseResist: confuseResist, 
+      actions: actions, status: { poison: false, sleep: 0, confuse: 0, seal: 0 },
+      nextEnemyData: nextEnemyData // ★追加: 生成した敵ステータスに第二形態の情報を格納
+    };
+
+    // ▼ 追加: 画像があれば敵の要素に背景画像として設定し、文字を消す
+    if (imgKey && loadedImages[imgKey] && loadedImages[imgKey].isLoaded) {
+      const img = loadedImages[imgKey];
+      enemyImg.style.backgroundImage = `url('${img.src}')`;
+      enemyImg.style.backgroundSize = '100% 100%'; 
+      enemyImg.style.backgroundRepeat = 'no-repeat';
+      enemyImg.style.backgroundPosition = 'center';
+      enemyImg.style.backgroundColor = 'transparent';
+      
+      // ▼ 画像の本来のサイズを取得し、要素のサイズとして設定する
+      const scale = 2; // デフォルトで2倍表示。原寸大が良い場合は1に変更してください
+      enemyImg.style.width = (img.width * scale) + 'px';
+      enemyImg.style.height = (img.height * scale) + 'px';
+      enemyImg.style.imageRendering = 'pixelated'; // 拡大時にドット感を保つ
+      
+      enemyImg.innerText = "";
+    } else {
+      enemyImg.style.backgroundImage = 'none';
+      enemyImg.style.backgroundColor = 'var(--text-color)';
+      // ▼ 画像がない場合はデフォルトの100x100サイズに戻す
+      enemyImg.style.width = '100px';
+      enemyImg.style.height = '100px';
+      enemyImg.innerText = "敵";
+    }
+
+    updateBattleStatus();
+    
+    const log = document.getElementById('battle-log'); 
+
+    // ★変更: 連戦時はログを区切って前の情報を残す
+    if (isConsecutive) {
+        log.innerHTML += `<hr style="border-color: #555; margin: 10px 0;"><p>${currentEnemy.name} が あらわれた！</p>`; 
+    } else {
+        log.innerHTML = `<p>${currentEnemy.name} が あらわれた！</p>`; 
+    }
+    log.scrollTop = log.scrollHeight; 
+    setTimeout(() => { document.getElementById('battle-commands').classList.remove('hidden'); uiSelections.battle = 0; updateScreen(); }, 800); 
+  };
+
+  // ★追加: 連戦フラグが立っている場合はトランジション（画面フェードアウト/イン）を省略して即開始
+  if (isConsecutive) {
+      initBattle();
+  } else {
+      playBattleTransition(() => {
+          initBattle();
+      });
+  }
+}
+
+function updateBattleStatus() { 
+  let pName = player.name;
+  if (player.status) {
+    if (player.status.poison) pName += " <span style='color:#f0f; font-size:12px;'>[毒]</span>";
+    if (player.status.sleep > 0) pName += " <span style='color:#0af; font-size:12px;'>[眠]</span>";
+    if (player.status.confuse > 0) pName += " <span style='color:#fa0; font-size:12px;'>[乱]</span>";
+    if (player.status.seal > 0) pName += " <span style='color:#a0a; font-size:12px;'>[封]</span>";
+  }
+  document.getElementById('b-name').innerHTML = pName; 
+  document.getElementById('b-lv').innerText = player.level;
+  document.getElementById('b-hp').innerText = player.hp; 
+  document.getElementById('b-mp').innerText = player.mp; 
+}
+function blinkEnemy() { const el = document.getElementById('enemy-img'); el.classList.remove('anim-blink'); void el.offsetWidth; el.classList.add('anim-blink'); }
+
+function hideBattleCommands() { document.getElementById('battle-commands').classList.add('hidden'); document.getElementById('battle-sub-window').classList.add('hidden'); battleMenuState = 'main'; }
+
+function applyPreActionStatus(battler, isPlayer) {
+  const name = isPlayer ? player.name : battler.name;
+  let canAct = true;
+  let actionText = "";
+
+  if (battler.status.seal > 0) battler.status.seal--;
+
+  if (battler.status.sleep > 0) {
+    battler.status.sleep--;
+    actionText = `${name} は 眠っている！`;
+    canAct = false;
+    if (battler.status.sleep === 0) actionText += `<br>${name} は 目を覚ました！`;
+  } else if (battler.status.confuse > 0) {
+    battler.status.confuse--;
+    if (Math.random() < 0.5) {
+       actionText = `${name} は 混乱している！<br>${name} は 自分を攻撃した！`;
+       let dmg = Math.max(1, Math.floor((isPlayer ? getPlayerAtk() : battler.attack) / 2));
+       battler.hp = Math.max(0, battler.hp - dmg);
+       actionText += `<br>${name} に ${dmg} のダメージ！`;
+       if (!isPlayer) {
+           setTimeout(blinkEnemy, 500);
+       } else {
+           playSE('damage');
+           const display = document.getElementById('game-display');
+           display.classList.remove('anim-damage'); void display.offsetWidth; display.classList.add('anim-damage');
+       }
+       canAct = false;
+    }
+    if (battler.status.confuse === 0) actionText += `<br>${name} は われにかえった！`;
+  }
+  return { canAct, actionText };
+}
+
+function applyPostTurnStatus() {
+    let logTxt = "";
+    if (player.status.poison && player.hp > 0) {
+        let dmg = Math.max(1, Math.floor(player.maxHp * 0.1));
+        player.hp = Math.max(0, player.hp - dmg);
+        logTxt += `<p>${player.name} は 毒で ${dmg} のダメージを受けた！</p>`;
+        const display = document.getElementById('game-display');
+        display.classList.remove('anim-damage'); void display.offsetWidth; display.classList.add('anim-damage');
+    }
+    if (currentEnemy && currentEnemy.hp > 0 && currentEnemy.status && currentEnemy.status.poison) {
+        let dmg = Math.max(1, Math.floor(currentEnemy.maxHp * 0.1));
+        currentEnemy.hp = Math.max(0, currentEnemy.hp - dmg);
+        logTxt += `<p>${currentEnemy.name} は 毒で ${dmg} のダメージを受けた！</p>`;
+        blinkEnemy();
+    }
+    return logTxt;
+}
+
+function executeTurn(playerActionFn, priority = false) {
+  hideBattleCommands();
+  const log = document.getElementById('battle-log');
+  
+  const pAgi = player.agi * (0.8 + Math.random() * 0.4);
+  const eAgi = currentEnemy.agi * (0.8 + Math.random() * 0.4);
+  const playerFirst = priority || pAgi >= eAgi;
+
+  const enemyActionFn = () => {
+    if (currentEnemy.hp <= 0) return false; 
+    
+    let preCheck = applyPreActionStatus(currentEnemy, false);
+    if (!preCheck.canAct) {
+       log.innerHTML += `<p>${preCheck.actionText}</p>`;
+       log.scrollTop = log.scrollHeight;
+       updateBattleStatus();
+       return true;
+    }
+
+    if (currentEnemy.fleeRate > 0 && Math.random() < currentEnemy.fleeRate) {
+        log.innerHTML += `<p>${currentEnemy.name} は にげだした！</p><p>▼ 決定ボタンで進む</p>`;
+        log.scrollTop = log.scrollHeight;
+        battleMenuState = 'end';
+        return false;
+    }
+
+    let actionText = "";
+    let useAction = "こうげき"; 
+    if (currentEnemy.actions && currentEnemy.actions.length > 0) {
+       useAction = currentEnemy.actions[Math.floor(Math.random() * currentEnemy.actions.length)]; 
+    }
+
+    if (useAction === "逃げる") {
+        log.innerHTML += `<p>${currentEnemy.name} は にげだした！</p><p>▼ 決定ボタンで進む</p>`;
+        log.scrollTop = log.scrollHeight;
+        battleMenuState = 'end';
+        return false;
+    } else if (useAction === "ラリホー") {
+       if (currentEnemy.status.seal > 0) {
+           actionText = `${currentEnemy.name} は ラリホーを となえた！<br>しかし 呪文は かき消された！`;
+       } else { 
+         if (Math.random() < 0.5) { 
+             player.status.sleep = 2 + Math.floor(Math.random()*3); 
+             actionText = `${currentEnemy.name} は ラリホーを となえた！<br>${player.name} は 眠ってしまった！`; 
+         } else { 
+             actionText = `${currentEnemy.name} は ラリホーを となえた！<br>しかし ${player.name} には 効かなかった！`; 
+         }
+       }
+    } else if (useAction === "マホトーン") {
+       if (currentEnemy.status.seal > 0) {
+           actionText = `${currentEnemy.name} は マホトーンを となえた！<br>しかし 呪文は かき消された！`;
+       } else { 
+         if (Math.random() < 0.5) { 
+             player.status.seal = 3 + Math.floor(Math.random()*3); 
+             actionText = `${currentEnemy.name} は マホトーンを となえた！<br>${player.name} の 呪文が 封じられた！`; 
+         } else { 
+             actionText = `${currentEnemy.name} は マホトーンを となえた！<br>しかし ${player.name} には 効かなかった！`; 
+         }
+       }
+    } else if (useAction === "メダパニ") {
+       if (currentEnemy.status.seal > 0) {
+           actionText = `${currentEnemy.name} は メダパニを となえた！<br>しかし 呪文は かき消された！`;
+       } else { 
+         if (Math.random() < 0.5) { 
+             player.status.confuse = 2 + Math.floor(Math.random()*3); 
+             actionText = `${currentEnemy.name} は メダパニを となえた！<br>${player.name} は 混乱してしまった！`; 
+         } else { 
+             actionText = `${currentEnemy.name} は メダパニを となえた！<br>しかし ${player.name} には 効かなかった！`; 
+         }
+       }
+    } else if (useAction === "毒攻撃" || useAction === "こうげき") {
+    // 追加: 敵の攻撃時の命中判定（プレイヤーの回避）
+    const hitRate = 0.9 - (player.agi / 1000);
+    const isHit = Math.random() < hitRate;
+
+    if (!isHit) {
+        playSE('miss'); // 追加: 攻撃が外れた時の音
+        actionText = `${currentEnemy.name} の ${useAction === "毒攻撃" ? "どくこうげき" : "こうげき"}！<br>しかし ${player.name} は ひらりと みかわした！`;
+    } else {
+        let damage = Math.max(1, currentEnemy.attack - (getPlayerDef() / 2));
+        if (isPlayerDefending) damage = Math.floor(damage / 2);
+        player.hp = Math.max(0, player.hp - Math.floor(damage));
+        
+        if (useAction === "毒攻撃" && Math.random() < 0.3) {
+            player.status.poison = true;
+            actionText = `${currentEnemy.name} の どくこうげき！<br>${player.name} は ${Math.floor(damage)} のダメージを受け 毒におかされた！`;
+        } else {
+            actionText = `${currentEnemy.name} の こうげき！<br>${player.name} は ${Math.floor(damage)} のダメージを受けた！`;
+        }
+    }
+} else { 
+    // 魔法など他の行動のフォールバック用（重複していたelseを1つに統合）
+    let damage = Math.max(1, currentEnemy.attack - (getPlayerDef() / 2));
+    if (isPlayerDefending) damage = Math.floor(damage / 2);
+    player.hp = Math.max(0, player.hp - Math.floor(damage));
+    actionText = `${currentEnemy.name} の こうげき！<br>${player.name} は ${Math.floor(damage)} のダメージを受けた！`;
+}
+
+    log.innerHTML += `<p>${actionText}</p>`;
+    log.scrollTop = log.scrollHeight;
+    if (actionText.includes("ダメージ")) {
+      playSE('damage');
+      const display = document.getElementById('game-display');
+      display.classList.remove('anim-damage'); void display.offsetWidth; display.classList.add('anim-damage');
+    }
+    updateBattleStatus();
+    return true;
+  };
+
+  const pActionFn = () => {
+    if (player.hp <= 0) return false;
+    let preCheck = applyPreActionStatus(player, true);
+    if (!preCheck.canAct) {
+       log.innerHTML += `<p>${preCheck.actionText}</p>`;
+       log.scrollTop = log.scrollHeight;
+       updateBattleStatus();
+       return true;
+    }
+    return playerActionFn(); 
+  };
+
+  const endTurn = () => {
+    let pTxt = applyPostTurnStatus();
+    if (pTxt) {
+      log.innerHTML += pTxt;
+      log.scrollTop = log.scrollHeight;
+      updateBattleStatus();
+    }
+    setTimeout(() => {
+      if (player.hp <= 0) handleDeath();
+      else if (currentEnemy.hp <= 0) endBattle(true);
+      else { isPlayerDefending = false; document.getElementById('battle-commands').classList.remove('hidden'); updateScreen(); }
+    }, pTxt ? 1500 : 0);
+  };
+
+  if (playerFirst) {
+    if (pActionFn() === false) return; 
+    setTimeout(() => {
+      if (player.hp <= 0 || currentEnemy.hp <= 0) { endTurn(); return; }
+      if (enemyActionFn() === false) return; 
+      setTimeout(() => {
+        endTurn();
+      }, 1500);
+    }, 1500);
+  } else {
+    if (enemyActionFn() === false) return; 
+    setTimeout(() => {
+      if (player.hp <= 0 || currentEnemy.hp <= 0) { endTurn(); return; }
+      if (pActionFn() === false) return; 
+      setTimeout(() => {
+        endTurn();
+      }, 1500);
+    }, 1500);
+  }
+}
+
+function processBattleCommand(cmdIndex) { 
+  const log = document.getElementById('battle-log'); 
+  
+  if (cmdIndex === 0) { 
+    executeTurn(() => {
+      let actionText = "";
+
+      // 追加: 命中判定 (基本90%命中とし、敵の素早さで微調整)
+      const hitRate = 0.9 - (currentEnemy.agi / 1000);
+      const isHit = Math.random() < hitRate;
+
+      if (!isHit) {
+        playSE('miss'); // 追加: 攻撃が外れた時の音
+        actionText = `${player.name} の こうげき！<br>しかし 攻撃は はずれた！`;
+        log.innerHTML += `<p>${actionText}</p>`; log.scrollTop = log.scrollHeight; updateBattleStatus();
+        return true;
+      }
+
+      playSE('attack');
+      const criticalRate = (1 / 64) + (player.luck / 1024);
+      const isCritical = Math.random() < criticalRate;
+      let damage = 0;
+      if (isCritical) {
+        damage = getPlayerAtk(); 
+        actionText = `${player.name} の こうげき！<br><span style="color:#ff5555; font-weight:bold;">かいしんのいちげき！</span><br>${currentEnemy.name} に ${Math.floor(damage)} のダメージ！`;
+        const el = document.getElementById('enemy-img'); 
+        el.classList.remove('anim-critical'); void el.offsetWidth; el.classList.add('anim-critical');
+      } else {
+        damage = Math.max(1, getPlayerAtk() - (currentEnemy.def/2)); 
+        actionText = `${player.name} の こうげき！<br>${currentEnemy.name} に ${Math.floor(damage)} のダメージ！`;
+        blinkEnemy(); 
+      }
+      currentEnemy.hp = Math.max(0, currentEnemy.hp - damage); 
+      log.innerHTML += `<p>${actionText}</p>`; log.scrollTop = log.scrollHeight; updateBattleStatus();
+      return true;
+    });
+  } else if (cmdIndex === 3) { 
+    executeTurn(() => {
+      isPlayerDefending = true; 
+      log.innerHTML += `<p>${player.name} は 身を 守っている！</p>`; log.scrollTop = log.scrollHeight; updateBattleStatus();
+      return true;
+    }, true); 
+  } else if (cmdIndex === 4) { 
+    executeTurn(() => {
+      if (Math.random() > 0.3) { 
+        log.innerHTML += `<p>${player.name} は にげだした！</p><p>▼ 決定ボタンで進む</p>`; 
+        log.scrollTop = log.scrollHeight;
+        battleMenuState = 'end';
+        return false; 
+      } else { 
+        log.innerHTML += `<p>${player.name} は にげだした！<br>しかし まわりこまれてしまった！</p>`; 
+        log.scrollTop = log.scrollHeight; updateBattleStatus();
+        return true;
+      } 
+    }, true); 
+  } 
+}
+
+function processMagic(index) { 
+  const spellName = player.spells[index]; 
+  const spell = SPELL_DB[spellName];
+  const log = document.getElementById('battle-log'); 
+  executeTurn(() => {
+    playSE('magic');
+    let actionText = ""; 
+    if (player.status.seal > 0) {
+       actionText = `${player.name} は ${spellName}を となえた！<br>しかし 呪文は かき消された！`;
+    } else if (spellName === "ルーラ") {
+       actionText = `ここでは つかえない か なにも おきなかった！`;
+    } else if (spell) {
+       if (player.mp >= spell.mp) {
+           player.mp = Math.max(0, player.mp - spell.mp);
+           actionText = `${player.name} は ${spellName}を となえた！<br>`;
+           if (spell.type === "attack") {
+               let dmg = spell.val + Math.floor(Math.random()*10); 
+               currentEnemy.hp = Math.max(0, currentEnemy.hp - dmg);
+               actionText += `${currentEnemy.name} に ${dmg} ${spell.text}`;
+               blinkEnemy();
+           } else if (spell.type === "heal") {
+               player.hp = Math.min(player.maxHp, player.hp + spell.val);
+               actionText += `${player.name} の ${spell.text}`;
+           } else if (spell.type === "cure") {
+               if (player.status[spell.status]) {
+                   player.status[spell.status] = false;
+                   actionText += `${player.name} の ${spell.text}`;
+               } else {
+                   actionText += `しかし なにも おきなかった！`;
+               }
+           } else if (spell.type === "status") {
+               let resist = 0.5; // ★ここから追加
+               if (spell.status === "sleep") resist = currentEnemy.sleepResist;
+               if (spell.status === "seal") resist = currentEnemy.sealResist;
+               if (spell.status === "confuse") resist = currentEnemy.confuseResist;
+               
+               if (Math.random() < resist) { // ★ここまで追加
+                   currentEnemy.status[spell.status] = spell.val; 
+                   if(spell.status === 'poison') currentEnemy.status.poison = true;
+                   actionText += `${currentEnemy.name} ${spell.text}`;
+               } else {
+                   actionText += `しかし ${currentEnemy.name} には 効かなかった！`;
+               }
+           }
+       } else {
+           actionText = `ＭＰが 足りない！`;
+       }
+    } else {
+       actionText = `ここでは つかえない か なにも おきなかった！`;
+    }
+    log.innerHTML += `<p>${actionText}</p>`; log.scrollTop = log.scrollHeight; updateBattleStatus(); 
+    return true;
+  });
+}
+
+function processItem(index) { 
+  const item = player.inventory[index]; 
+  const log = document.getElementById('battle-log'); 
+  executeTurn(() => {
+    playSE('item');
+    let actionText = ""; 
+    if (item.type === "heal") { 
+      const heal = item.val || 20; player.hp = Math.min(player.maxHp, player.hp + heal); 
+      actionText = `${player.name} は ${item.name} を 使った！<br>ＨＰが ${heal} かいふくした！`; item.count--; 
+      if (item.count <= 0) player.inventory.splice(index, 1); 
+    } else if (item.type === "cure") {
+      if (player.status.poison) {
+         player.status.poison = false;
+         actionText = `${player.name} は ${item.name} を 使った！<br>毒が ぬけた！`;
+      } else {
+         actionText = `${player.name} は ${item.name} を 使おうとしたが なにも おきなかった。`;
+      }
+      item.count--; 
+      if (item.count <= 0) player.inventory.splice(index, 1); 
+    } else if (item.type === "seed") {
+      actionText = `${player.name} は ${item.name} を 使おうとしたが<br>いまは それどころではない！`;
+    } else if (item.type === "key") {
+      actionText = `${player.name} は ${item.name} を 使おうとしたが<br>ここでは なにも おきなかった。<br>（扉に向かって 決定ボタンで 使おう）`;
+    } else actionText = `${player.name} は ${item.name} を 使おうとしたが なにも おきなかった。`; 
+    log.innerHTML += `<p>${actionText}</p>`; log.scrollTop = log.scrollHeight; updateBattleStatus(); 
+    return true;
+  });
+}
+
+function endBattle(isWin) { 
+  const log = document.getElementById('battle-log'); 
+  if (isWin) { 
+    // ▼ 音声再生の追加：第二形態がなければ（完全に勝利したら）勝利BGMを鳴らす
+    if (!currentEnemy.nextEnemyData) {
+      stopBGM();
+      playBGM('victory', false); // 勝利BGMを再生
+    }
+
+    document.getElementById('enemy-img').style.visibility = 'hidden';
+    log.innerHTML += `<p>${currentEnemy.name} を たおした！<br>${currentEnemy.exp} の経験値 と ${currentEnemy.gold} ゴールドを獲得！</p>`; 
+    player.exp += currentEnemy.exp; player.gold += currentEnemy.gold; 
+    
+    const adjustedDropRate = currentEnemy.dropRate * (1 + player.luck / 200);
+    if (currentEnemy.dropItem && Math.random() < adjustedDropRate) {
+      log.innerHTML += `<p style="color:yellow">${currentEnemy.dropItem} を おとした！</p>`;
+      const itemData = ITEM_DB[currentEnemy.dropItem] || { name: currentEnemy.dropItem, type: "heal", val: 20, price: 10 };
+      pushToInventory(itemData);
+    }
+
+    let hasLeveledUp = false;
+    while (player.level < 99 && NEXT_EXP[player.level] && player.exp >= NEXT_EXP[player.level]) { 
+      player.level++; 
+      hasLeveledUp = true;
+      let upHp = 3 + Math.floor(Math.random()*4); let upMp = 2 + Math.floor(Math.random()*3);
+      let upStr = 2 + Math.floor(Math.random()*2); let upDef = 2 + Math.floor(Math.random()*2);
+      let upAgi = 2 + Math.floor(Math.random()*2); let upInt = 2 + Math.floor(Math.random()*2);
+      let upLuck = 2 + Math.floor(Math.random()*2);
+
+      if (player.maxHp + upHp > 999) upHp = 999 - player.maxHp;
+      if (player.maxMp + upMp > 999) upMp = 999 - player.maxMp;
+      if (player.str + upStr > 999) upStr = 999 - player.str;
+      if (player.def + upDef > 999) upDef = 999 - player.def;
+      if (player.agi + upAgi > 999) upAgi = 999 - player.agi;
+      if (player.int + upInt > 999) upInt = 999 - player.int;
+      if (player.luck + upLuck > 999) upLuck = 999 - player.luck;
+
+      player.maxHp += upHp; player.hp = player.maxHp; 
+      player.maxMp += upMp; player.mp = player.maxMp; 
+      player.str += upStr; player.def += upDef; player.agi += upAgi; player.int += upInt; player.luck += upLuck;
+      
+      let levelUpMsg = `<p style="color:yellow; line-height:1.2; margin:5px 0;">レベル${player.level} に あがった！<br>`;
+      levelUpMsg += `最大ＨＰ +${upHp} / 最大ＭＰ +${upMp}<br>`;
+      levelUpMsg += `ちから +${upStr} / みのまもり +${upDef}<br>`;
+      levelUpMsg += `かしこさ +${upInt} / すばやさ +${upAgi}<br>`;
+      levelUpMsg += `うんのよさ +${upLuck}</p>`;
+      log.innerHTML += levelUpMsg; 
+
+      if (SPELL_LEARN_TABLE[player.level]) {
+        SPELL_LEARN_TABLE[player.level].forEach(spell => {
+           if (!player.spells.includes(spell)) {
+               player.spells.push(spell);
+               log.innerHTML += `<p style="color:yellow">${spell}を おぼえた！</p>`;
+           }
+        });
+      }
+    }
+
+    if (hasLeveledUp) {
+      playSE('levelup');
+    }
+
+    log.innerHTML += `<p>▼ 決定ボタンで進む</p>`;
+    log.scrollTop = log.scrollHeight; 
+    
+    // ★追加: 第二形態のデータが存在すれば次の戦闘待機状態へ、なければ戦闘を終了する
+    if (currentEnemy.nextEnemyData) {
+        battleMenuState = 'next_battle';
+    } else {
+        battleMenuState = 'end';
+    }
+  } 
+}
+
+function updateMenuUI() {
+  const details = document.getElementById('menu-details'); details.classList.remove('hidden');
+  const menus = document.getElementById('menu-main').children;
+  for (let i = 0; i < menus.length; i++) menus[i].classList.toggle('selected', menuState === 'main' && i === uiSelections.menuMain);
+  if (menuState === 'main') {
+    let nextExpTxt = (player.level < 99 && NEXT_EXP[player.level]) ? (NEXT_EXP[player.level] - player.exp) : "なし";
+    let statusText = player.status.poison ? " <span style='color:#f0f;'>[毒]</span>" : "";
+    if (uiSelections.menuMain === 0) details.innerHTML = `<div style="display:flex; font-size:12px; line-height:1.6; letter-spacing:-0.5px; width:100%;"><div style="flex:1; padding-right:5px;">なまえ：${player.name}${statusText}<br>レベル：${player.level}<br>ＨＰ：${player.hp}/${player.maxHp}<br>ＭＰ：${player.mp}/${player.maxMp}<br>お金：${player.gold} G<br>次Lvまで：${nextExpTxt}</div><div style="flex:1;">ちから：${player.str}<br>みのまもり：${player.def}<br>かしこさ：${player.int}<br>すばやさ：${player.agi}<br>うんのよさ：${player.luck}<br>こうげき力：${getPlayerAtk()}<br>しゅび力：${getPlayerDef()}</div></div>`;
+    else if (uiSelections.menuMain === 1) details.innerHTML = `<div>ぶき：${player.equipment.weapon?player.equipment.weapon.name:"なし"}</div><div>たて：${player.equipment.shield?player.equipment.shield.name:"なし"}</div><div>かぶと：${player.equipment.helmet?player.equipment.helmet.name:"なし"}</div><div>よろい：${player.equipment.armor?player.equipment.armor.name:"なし"}</div>`;
+    else if (uiSelections.menuMain === 2) details.innerHTML = player.inventory.length > 0 ? `<div>${player.inventory.map(i => i.name + " x" + i.count).join('<br>')}</div>` : `<div>どうぐを もっていない</div>`;
+    else if (uiSelections.menuMain === 3) details.innerHTML = player.spells.length > 0 ? `<div>${player.spells.join('<br>')}</div>` : `<div>じゅもんを おぼえていない</div>`;
+    else if (uiSelections.menuMain === 4) details.innerHTML = `<div>〇ボタンで セーブする</div>`;
+    else if (uiSelections.menuMain === 5) details.innerHTML = `<div>〇ボタンで<br>タイトルへもどる</div>`;
+  } else if (menuState === 'equip_tab') { let html = '<div style="margin-bottom:10px;">【そうび 変更】</div>'; EQUIP_NAMES.forEach((n, i) => { const e = player.equipment[EQUIP_TYPES[i]]; html += `<div class="menu-item${(i === menuIndices.equipTab)?' selected':''}">${n}：${e?e.name:"なし"}</div>`; }); details.innerHTML = html;
+  } else if (menuState === 'equip_list') { let html = '<div style="margin-bottom:10px;">【どれを そうびする？】</div><div class="menu-item'+(menuIndices.equipList===0?' selected':'')+'">はずす</div>'; filteredItems.forEach((item, i) => { html += `<div class="menu-item${(i + 1 === menuIndices.equipList)?' selected':''}">${item.name}</div>`; }); details.innerHTML = html;
+  } else if (menuState === 'item_list') { let html = '<div style="margin-bottom:10px;">【どうぐ】</div>'; player.inventory.forEach((item, i) => { html += `<div class="menu-item${(i === menuIndices.itemList)?' selected':''}">${item.name} x${item.count}</div>`; }); details.innerHTML = html;
+  } else if (menuState === 'item_action') { let html = `<div style="margin-bottom:10px;">${player.inventory[selectedItemIndex].name}</div>`; ['つかう', 'すてる'].forEach((act, i) => { html += `<div class="menu-item${(i === menuIndices.itemAction)?' selected':''}">${act}</div>`; }); details.innerHTML = html;
+  } else if (menuState === 'item_use_count') {
+    let item = player.inventory[selectedItemIndex];
+    let html = `<div style="margin-bottom:10px;">${item.name} を 何個つかう？</div>`;
+    html += `<div style="display:flex; justify-content:center; align-items:center; margin:20px 0; font-size:18px;">`;
+    html += `<span>◀</span><span style="margin: 0 30px;">${useItemCount}</span><span>▶</span>`;
+    html += `</div><div style="text-align:center; font-size:12px; margin-top:10px;">決定ボタンで つかう</div>`;
+    details.innerHTML = html;
+  } else if (menuState === 'magic_list') { let html = '<div style="margin-bottom:10px;">【じゅもん】</div>'; player.spells.forEach((spell, i) => { html += `<div class="menu-item${(i === menuIndices.magicList)?' selected':''}">${spell}</div>`; }); details.innerHTML = html; 
+  } else if (menuState === 'rula_list') { let html = '<div style="margin-bottom:10px;">【どこへ いく？】</div>'; rulaTargets.forEach((t, i) => { html += `<div class="menu-item${(i === menuIndices.rulaList)?' selected':''}">${t.name}</div>`; }); details.innerHTML = html; }
+}
+
+function hasSaveData() { return localStorage.getItem('rpg_save_data') !== null; }
+function saveGame() { localStorage.setItem('rpg_save_data', JSON.stringify({ player, currentMapId })); }
+function loadGame() { 
+  const data = localStorage.getItem('rpg_save_data'); 
+  if (data) { 
+    const parsed = JSON.parse(data); 
+    player = parsed.player; 
+    if (player.luck === undefined) player.luck = 5;
+    if (!player.status) player.status = { poison: false, sleep: 0, confuse: 0, seal: 0 };
+    currentMapId = parsed.currentMapId; 
+    generateMap(); 
+    return true; 
+  } 
+  return false; 
+}
+
+function handleChoiceAction(choice, npc) {
+  if (choice.action === 'battle') {
+    // 選択肢NPCにも戦闘NPCと同様にステータスや画像・第二形態のデータを紐づけるため、npcとchoiceのデータを結合します。
+    let battleData = { ...npc, ...choice };
+    // choice側にvalue(敵の名前など)がある場合は、敵の名前として優先適用します。
+    if (choice.value && !choice.custom && typeof choice.value === 'string') {
+      battleData.enemy = choice.value;
+    }
+    startEventBattle(battleData);
+  } else showMessage(choice.value);
+}
+
+// 目の前の扉を開ける処理を行う関数
+function checkDoorAction(tx, ty) {
+  const mapObj = mapsData[currentMapId];
+  if (tx < 0 || tx >= mapObj.width || ty < 0 || ty >= mapObj.height) return false;
+  
+  // マップ上のタイルIDを取得
+  const tile = mapObj.data[ty][tx];
+  
+  // タイルIDから必要な鍵を判定
+  let keyNeeded = null;
+  if (tile === 18) keyNeeded = "とうぞくのかぎ";      // 茶色の扉
+  else if (tile === 19) keyNeeded = "まほうのかぎ";    // 青色の扉
+  else if (tile === 20) keyNeeded = "さいごのかぎ";    // 赤色の扉
+
+  if (keyNeeded) {
+    // インベントリ内に該当の鍵があるかチェック
+    const hasKey = player.inventory.some(item => item.name === keyNeeded);
+    
+    if (hasKey) {
+      playSE('ok'); // または扉が開く専用のSE（'door'等）があれば変更
+      
+      // マップエディタで設定した透過背景タイル(bgData)を取得。なければ平地(0)
+      let baseTileId = 0; 
+const doorNpc = mapObj.npcs[`${tx},${ty}`];
+if (doorNpc && doorNpc.bgTile !== undefined && doorNpc.bgTile !== -1) {
+    baseTileId = doorNpc.bgTile;
+} else if (doorNpc && doorNpc.bgTileId !== undefined && doorNpc.bgTileId !== -1) {
+    baseTileId = doorNpc.bgTileId;
+} 
+else if (mapObj.bgData && mapObj.bgData[ty] && mapObj.bgData[ty][tx] !== undefined && mapObj.bgData[ty][tx] !== -1) {
+  baseTileId = mapObj.bgData[ty][tx];
+}
+      
+      // 扉タイルを元の床タイルに書き換えて通行可能にする
+      mapObj.data[ty][tx] = baseTileId;
+      drawField(); // 画面を再描画して開いた状態を反映
+      showMessage(`${player.name} は ${keyNeeded} を 使った！\n扉が 開いた！`);
+    } else {
+      playSE('cancel');
+      showMessage(`かたく 閉ざされている。\n開けるには ${keyNeeded} が 必要だ。`);
+    }
+    return true; // 対象が扉だったためtrueを返し、後続のNPC判定をスキップさせる
+  }
+  return false; // 対象が扉ではなかった場合はfalseを返す
+}
+
+function handleOk() {
+  playSE('ok');
+  if (isFading) return; 
+  if (currentState === GAME_STATE.TITLE) {
+    if (uiSelections.title === 0) { resetPlayer(); switchState(GAME_STATE.NAME_INPUT); }
+    else { if (loadGame()) switchState(GAME_STATE.FIELD); else alert("セーブデータが ありません"); }
+  } else if (currentState === GAME_STATE.NAME_INPUT) {
+    const name = document.getElementById('player-name-input').value.trim();
+    if (name.length > 0) { player.name = name; switchState(GAME_STATE.FIELD); }
+  } else if (currentState === GAME_STATE.FIELD) {
+    let cx = player.x, cy = player.y;
+    if (player.dir === 'up') cy--; if (player.dir === 'down') cy++;
+    if (player.dir === 'left') cx--; if (player.dir === 'right') cx++;
+    if (checkDoorAction(cx, cy)) {
+      return; // 目の前が扉であり、判定処理を行った場合はここで処理を終了する
+    }
+
+    const map = mapsData[currentMapId];
+    if (map.npcs[`${cx},${cy}`]) {
+      const npc = map.npcs[`${cx},${cy}`];
+      const type = npc.type || 'talk';
+      const text = npc.text || "......";
+      const objKey = `${currentMapId}_${cx}_${cy}`;
+      const npcDef = NPC_DB[type] || NPC_DB['talk'];
+      
+      if (npcDef.isObject) {
+        if (player.opened && player.opened.includes(objKey)) { showMessage("しかし なにも なかった。"); } 
+        else {
+          if (!player.opened) player.opened = [];
+          player.opened.push(objKey);
+
+          // 初期値をマップデータ（オブジェクト自身）ではなく、0（平地）にする
+          let baseTileId = 0; 
+if (npc.openedTile !== undefined && npc.openedTile !== -1) {
+  baseTileId = npc.openedTile;
+} else if (npc.openedTileId !== undefined && npc.openedTileId !== -1) {
+  baseTileId = npc.openedTileId;
+}
+else if (npc.bgTile !== undefined && npc.bgTile !== -1) {
+  baseTileId = npc.bgTile;
+} else if (npc.bgTileId !== undefined && npc.bgTileId !== -1) {
+  baseTileId = npc.bgTileId;
+} else if (npc.baseTile !== undefined && npc.baseTile !== -1) {
+  baseTileId = npc.baseTile;
+}
+else if (map.bgData && map.bgData[cy] && map.bgData[cy][cx] !== undefined && map.bgData[cy][cx] !== -1) {
+  baseTileId = map.bgData[cy][cx];
+}
+          map.data[cy][cx] = baseTileId;
+
+          const itemName = npc.item || "やくそう";
+          if (itemName.endsWith("G") || itemName.endsWith("Ｇ")) { const gold = parseInt(itemName); player.gold += gold; showMessage(`${gold}ゴールドを 手に入れた！`); } 
+          else { const itemData = ITEM_DB[itemName] || { name: itemName, type: "heal", val: 20, price: 10 }; pushToInventory(itemData); showMessage(`${itemName}を 手に入れた！`); }
+          drawField();
+        }
+      }
+      else if (type === 'talk' || type === 'king') { showMessage(text); }
+      else if (type === 'battle') { showMessage(text, () => startEventBattle(npc)); }
+      else if (type === 'choice') { showMessage(text, () => { showConfirm(() => handleChoiceAction(npc.choices[0], npc), () => handleChoiceAction(npc.choices[1], npc), npc.choices[0].label, npc.choices[1].label); }); }
+      else if (type === 'inn') {
+        showMessage([text, `１泊 ${npc.price} G ですが 泊まりますか？`], () => {
+          showConfirm(() => {
+            if (player.gold >= npc.price) { 
+                // 【既存の処理】 お金の消費、HP・MPの回復、状態異常の解除（この部分は変更していません）
+                player.gold -= npc.price; player.hp = player.maxHp; player.mp = player.maxMp; 
+                if (player.status) player.status = { poison: false, sleep: 0, confuse: 0, seal: 0 };
+                
+                // === 追加・変更した処理ここから ===
+                isFading = true; // 暗転中の移動やキー操作をブロックする
+                stopBGM(); // 宿屋の音がしっかり聞こえるように、現在のフィールドBGMを止める
+                document.getElementById('fade-overlay').classList.add('active'); // 画面を暗転させる
+                playSE('inn'); // 宿屋の音を再生する
+                
+                // 6秒(6000ミリ秒)後に暗転を解除するタイマー
+                setTimeout(() => {
+                  document.getElementById('fade-overlay').classList.remove('active'); // 暗転解除
+                  
+                  // CSSの暗転解除アニメーション(0.5秒)が終わるのを待ってから処理を再開
+                  setTimeout(() => {
+                    isFading = false; // 操作ブロックを解除する
+                    playBGM('town'); // フィールドのBGMを再開する
+                    
+                    // 回復完了のメッセージを表示
+                    showMessage("おはようございます。---どうぞきをつけて いってらっしゃいませ！"); 
+                  }, 500); 
+                }, 6000); 
+                // === 追加・変更した処理ここまで ===
+
+            } else { showMessage("お金が 足りないようです..."); }
+          });
+        });
+      } else if (type.includes('_shop')) { openShop(npc); }
+    }
+  } else if (currentState === GAME_STATE.MESSAGE) {
+    displayNextMessage();
+  } else if (currentState === GAME_STATE.CONFIRM) {
+    document.getElementById('confirm-window').classList.remove('active');
+    if (confirmCursor === 0 && confirmCallbackYes) confirmCallbackYes();
+    else if (confirmCursor === 1 && confirmCallbackNo) confirmCallbackNo();
+    else switchState(GAME_STATE.FIELD);
+  } else if (currentState === GAME_STATE.SHOP) {
+    if (shopState === 'select') {
+      if (shopCursor === 0) { shopState = 'buy'; shopCursor = 0; document.getElementById('shop-msg').innerText = "どれを かうかね？"; updateShopUI(); }
+      else if (shopCursor === 1) { shopState = 'sell'; shopCursor = 0; document.getElementById('shop-msg').innerText = "どれを うるかね？"; updateShopUI(); }
+      else { closeShop(); }
+    } else if (shopState === 'buy') {
+      if (shopCursor === currentShopItems.length || currentShopItems.length === 0) { shopState = 'select'; shopCursor = 0; document.getElementById('shop-msg').innerText = "ほかに 用はあるかね？"; updateShopUI(); }
+      else {
+        const item = currentShopItems[shopCursor];
+        // 1. 確認メッセージを表示
+        document.getElementById('shop-msg').innerText = `${item.name} を かうかね？`;
+        // 2. 確認ウィンドウを呼び出し
+        showConfirm(
+          () => {
+            // 「はい」が選ばれた場合
+            currentState = GAME_STATE.SHOP; // 状態をショップに戻す
+            if (player.gold >= item.price) { 
+              player.gold -= item.price; pushToInventory(item); 
+              document.getElementById('shop-msg').innerHTML = `${item.name} を手に入れた！`; 
+            }
+            else { document.getElementById('shop-msg').innerHTML = `お金が 足りないようだ。`; }
+            updateShopUI();
+          },
+          () => {
+            // 「いいえ」が選ばれた場合
+            currentState = GAME_STATE.SHOP; // 状態をショップに戻す
+            document.getElementById('shop-msg').innerText = "どれを かうかね？";
+            updateShopUI();
+          }
+        );
+      }
+    } else if (shopState === 'sell') {
+      let sellableItems = player.inventory.filter(i => (i.price && i.price > 0) || (i.sellPrice !== undefined && i.sellPrice > 0));
+      if (shopCursor === sellableItems.length || sellableItems.length === 0) { shopState = 'select'; shopCursor = 1; document.getElementById('shop-msg').innerText = "ほかに 用はあるかね？"; updateShopUI(); }
+      else {
+        const item = sellableItems[shopCursor];
+        let sellPrice = item.sellPrice !== undefined ? item.sellPrice : Math.floor((item.price || 0) / 2);
+        // 1. 確認メッセージを表示
+        document.getElementById('shop-msg').innerText = `${item.name} を ${sellPrice} G で うるかね？`;
+        // 2. 確認ウィンドウを呼び出し
+        showConfirm(
+          () => {
+            // 「はい」が選ばれた場合
+            currentState = GAME_STATE.SHOP; // 状態をショップに戻す
+            player.gold += sellPrice;
+            item.count--;
+            if (item.count <= 0) player.inventory.splice(player.inventory.indexOf(item), 1);
+            document.getElementById('shop-msg').innerHTML = `${item.name} を ${sellPrice} G で買い取った！`;
+            shopCursor = Math.min(shopCursor, player.inventory.filter(i => (i.price && i.price > 0) || (i.sellPrice !== undefined && i.sellPrice > 0)).length);
+            updateShopUI();
+          },
+          () => {
+            // 「いいえ」が選ばれた場合
+            currentState = GAME_STATE.SHOP; // 状態をショップに戻す
+            document.getElementById('shop-msg').innerText = "どれを うるかね？";
+            updateShopUI();
+          }
+        );
+      }
+    }
+  } else if (currentState === GAME_STATE.BATTLE) {
+    if (battleMenuState === 'end') {
+      switchState(GAME_STATE.FIELD);
+    } else if (battleMenuState === 'next_battle') { 
+      // ★追加: 決定ボタン押下で第二形態（連戦）へ移行
+      let nextData = currentEnemy.nextEnemyData;
+      currentEnemy = null;
+      startEventBattle(nextData, true); // 第2引数 true を渡すことで画面遷移エフェクトをスキップ
+    } else if (!document.getElementById('battle-commands').classList.contains('hidden')) {
+      if (battleMenuState === 'main') { if (uiSelections.battle===0||uiSelections.battle===3||uiSelections.battle===4) processBattleCommand(uiSelections.battle); else if (uiSelections.battle===1 && player.spells.length>0) { battleMenuState='magic'; uiSelections.battleSub=0; updateScreen(); } else if (uiSelections.battle===2 && player.inventory.length>0) { battleMenuState='item'; uiSelections.battleSub=0; updateScreen(); } }
+      else if (battleMenuState === 'magic' && player.spells.length>0) processMagic(uiSelections.battleSub);
+      else if (battleMenuState === 'item' && player.inventory.length>0) processItem(uiSelections.battleSub);
+    }
+  } else if (currentState === GAME_STATE.MENU) {
+    if (menuState === 'main') {
+      if (uiSelections.menuMain === 1) { menuState = 'equip_tab'; menuIndices.equipTab = 0; updateMenuUI(); }
+      else if (uiSelections.menuMain === 2 && player.inventory.length > 0) { menuState = 'item_list'; menuIndices.itemList = 0; updateMenuUI(); }
+      else if (uiSelections.menuMain === 3 && player.spells.length > 0) { menuState = 'magic_list'; menuIndices.magicList = 0; updateMenuUI(); }
+      else if (uiSelections.menuMain === 4) { saveGame(); document.getElementById('menu-details').innerHTML = `<div>きろく しました。</div>`; setTimeout(() => updateMenuUI(), 1000); }
+      else if (uiSelections.menuMain === 5) { menuState = 'main'; switchState(GAME_STATE.TITLE); }
+    } else if (menuState === 'equip_tab') { filteredItems = player.inventory.filter(i => i.type === EQUIP_TYPES[menuIndices.equipTab]); menuState = 'equip_list'; menuIndices.equipList = 0; updateMenuUI();
+    } else if (menuState === 'equip_list') { const type = EQUIP_TYPES[menuIndices.equipTab]; if (menuIndices.equipList === 0) { const cur = player.equipment[type]; if (cur) { pushToInventory(cur); player.equipment[type] = null; } } else { const sel = filteredItems[menuIndices.equipList - 1]; sel.count--; if (sel.count <= 0) player.inventory.splice(player.inventory.indexOf(sel), 1); const cur = player.equipment[type]; if (cur) pushToInventory(cur); player.equipment[type] = { ...sel, count: 1 }; } menuState = 'equip_tab'; updateMenuUI();
+    } else if (menuState === 'item_list') { selectedItemIndex = menuIndices.itemList; menuState = 'item_action'; menuIndices.itemAction = 0; updateMenuUI();
+    } else if (menuState === 'item_action') { 
+      const item = player.inventory[selectedItemIndex]; 
+      if (menuIndices.itemAction === 0) { 
+        if (item.type === 'heal' || item.type === 'seed') { 
+          useItemCount = 1; menuState = 'item_use_count'; updateMenuUI(); 
+        } else if (item.type === 'cure') {
+          if (player.status.poison) {
+              player.status.poison = false;
+              item.count--;
+              if (item.count <= 0) player.inventory.splice(selectedItemIndex, 1);
+              document.getElementById('menu-details').innerHTML = `<div>${player.name} は ${item.name} をつかった！<br>毒が ぬけた！</div>`;
+          } else {
+              document.getElementById('menu-details').innerHTML = `<div>毒には おかされていない！</div>`;
+          }
+          setTimeout(() => { 
+             menuState = player.inventory.length === 0 ? 'main' : 'item_list'; 
+             menuIndices.itemList = Math.min(menuIndices.itemList, Math.max(0, player.inventory.length - 1));
+             updateMenuUI(); 
+          }, 1500);
+        } else { 
+          document.getElementById('menu-details').innerHTML = `<div>ここでは つかえない。</div>`; 
+          setTimeout(() => updateMenuUI(), 1000); 
+        } 
+      } else if (menuIndices.itemAction === 1) { 
+        player.inventory.splice(selectedItemIndex, 1); 
+        menuState = player.inventory.length === 0 ? 'main' : 'item_list'; 
+        menuIndices.itemList = Math.min(menuIndices.itemList, Math.max(0, player.inventory.length - 1));
+        updateMenuUI(); 
+      }
+    } else if (menuState === 'item_use_count') {
+      let item = player.inventory[selectedItemIndex];
+      if (item.type === 'heal') {
+        let healAmount = (item.val || 20) * useItemCount;
+        let oldHp = player.hp;
+        player.hp = Math.min(player.maxHp, player.hp + healAmount);
+        let actualHeal = player.hp - oldHp;
+        
+        item.count -= useItemCount;
+        if (item.count <= 0) player.inventory.splice(selectedItemIndex, 1);
+        
+        let msg = actualHeal > 0 ? `ＨＰが ${actualHeal} かいふくした！` : `しかし ＨＰは 満タンだった。`;
+        document.getElementById('menu-details').innerHTML = `<div style="line-height:1.4;">${player.name} は<br>${item.name} を ${useItemCount}個 つかった！<br>${msg}</div>`;
+      } else if (item.type === 'seed') {
+        let statKey = item.stat;
+        let maxLimit = 999;
+        let statName = "";
+        
+        if (statKey === 'maxHp') statName = "最大ＨＰ";
+        else if (statKey === 'maxMp') statName = "最大ＭＰ";
+        else if (statKey === 'str') statName = "ちから";
+        else if (statKey === 'def') statName = "みのまもり";
+        else if (statKey === 'int') statName = "かしこさ";
+        else if (statKey === 'agi') statName = "すばやさ";
+        else if (statKey === 'luck') statName = "うんのよさ";
+
+        if (player[statKey] >= maxLimit) {
+          document.getElementById('menu-details').innerHTML = `<div style="line-height:1.4;">${statName} は すでに最大だ！<br>これ以上は あがらない。</div>`;
+        } else {
+          let totalVal = 0;
+          let actualUsedCount = 0;
+          for(let i=0; i<useItemCount; i++){
+            let up = (statKey === 'maxHp' || statKey === 'maxMp') ? (3 + Math.floor(Math.random()*3)) : (1 + Math.floor(Math.random()*3));
+            if (player[statKey] + totalVal + up > maxLimit) {
+              up = maxLimit - (player[statKey] + totalVal);
+            }
+            totalVal += up;
+            actualUsedCount++;
+            if (player[statKey] + totalVal >= maxLimit) break; 
+          }
+          
+          player[statKey] += totalVal;
+          if (statKey === 'maxHp') player.hp += totalVal;
+          if (statKey === 'maxMp') player.mp += totalVal;
+          
+          item.count -= actualUsedCount;
+          if (item.count <= 0) player.inventory.splice(selectedItemIndex, 1);
+          
+          document.getElementById('menu-details').innerHTML = `<div style="line-height:1.4;">${player.name} は<br>${item.name} を ${actualUsedCount}個 つかった！<br>${statName} が ${totalVal} あがった！</div>`;
+        }
+      }
+      setTimeout(() => { 
+         menuState = player.inventory.length === 0 ? 'main' : 'item_list'; 
+         menuIndices.itemList = Math.min(menuIndices.itemList, Math.max(0, player.inventory.length - 1));
+         updateMenuUI(); 
+      }, 1500);
+    } else if (menuState === 'magic_list') { 
+      const spell = player.spells[menuIndices.magicList]; const d = document.getElementById('menu-details'); 
+      if (player.status && player.status.seal > 0) {
+          d.innerHTML = `<div>呪文が 封じられている！</div>`; setTimeout(() => updateMenuUI(), 1000); 
+      } else if (spell === "ホイミ" || spell === "ベホイミ" || spell === "ベホマ") {
+          let spellData = SPELL_DB[spell];
+          if (player.mp >= spellData.mp && player.hp < player.maxHp) { 
+              player.mp -= spellData.mp; player.hp = Math.min(player.maxHp, player.hp + spellData.val); 
+              d.innerHTML = `<div>${player.name} は ${spell}を となえた！<br>ＨＰが かいふくした！</div>`; setTimeout(() => updateMenuUI(), 1000); 
+          } else {
+              d.innerHTML = player.mp < spellData.mp ? `<div>ＭＰが 足りない！</div>` : `<div>ＨＰは 満タンだ！</div>`;
+              setTimeout(() => updateMenuUI(), 1000);
+          }
+      } else if (spell === "キアリー") {
+          let spellData = SPELL_DB[spell];
+          if (player.mp >= spellData.mp && player.status.poison) {
+              player.mp -= spellData.mp; player.status.poison = false;
+              d.innerHTML = `<div>${player.name} は キアリーを となえた！<br>毒が ぬけた！</div>`; setTimeout(() => updateMenuUI(), 1000);
+          } else {
+              d.innerHTML = player.mp < spellData.mp ? `<div>ＭＰが 足りない！</div>` : `<div>毒には おかされていない！</div>`;
+              setTimeout(() => updateMenuUI(), 1000);
+          }
+      } else if (spell === "ルーラ") {
+        if (player.mp >= SPELL_DB["ルーラ"].mp) {
+          rulaTargets = getRulaTargets();
+          if (rulaTargets.length === 0) { d.innerHTML = `<div>しかし なにも おきなかった！</div>`; setTimeout(() => updateMenuUI(), 1000); }
+          else { menuState = 'rula_list'; menuIndices.rulaList = 0; updateMenuUI(); }
+        } else { d.innerHTML = `<div>ＭＰが 足りない！</div>`; setTimeout(() => updateMenuUI(), 1000); }
+      } else { d.innerHTML = `<div>ここでは つかえない！</div>`; setTimeout(() => updateMenuUI(), 1000); } 
+    } else if (menuState === 'rula_list') {
+      const target = rulaTargets[menuIndices.rulaList];
+      player.mp -= SPELL_DB["ルーラ"].mp; 
+      isFading = true; 
+      document.getElementById('fade-overlay').classList.add('active');
+      setTimeout(() => {
+          currentMapId = target.mapId; player.x = target.x; player.y = target.y; player.dir = 'down';
+          switchState(GAME_STATE.FIELD);
+          drawField();
+          document.getElementById('fade-overlay').classList.remove('active');
+          setTimeout(() => { isFading = false; }, 500); 
+      }, 500);
+    }
+  }
+}
+
+function handleCancel() {
+  playSE('cancel');
+  if (isFading) return; 
+  if (currentState === GAME_STATE.MENU) {
+    if (menuState === 'main') switchState(GAME_STATE.FIELD);
+    else if (['equip_tab','item_list','magic_list'].includes(menuState)) { menuState = 'main'; updateMenuUI(); }
+    else if (menuState === 'equip_list') { menuState = 'equip_tab'; updateMenuUI(); }
+    else if (menuState === 'item_action') { menuState = 'item_list'; updateMenuUI(); }
+    else if (menuState === 'item_use_count') { menuState = 'item_action'; updateMenuUI(); }
+    else if (menuState === 'rula_list') { menuState = 'magic_list'; updateMenuUI(); }
+  } else if (currentState === GAME_STATE.BATTLE && battleMenuState !== 'main' && battleMenuState !== 'end') { battleMenuState = 'main'; updateScreen(); }
+  else if (currentState === GAME_STATE.SHOP) {
+    if (shopState === 'select') closeShop();
+    else if (shopState === 'buy') { shopState = 'select'; shopCursor = 0; document.getElementById('shop-msg').innerText = "ほかに 用はあるかね？"; updateShopUI(); }
+    else if (shopState === 'sell') { shopState = 'select'; shopCursor = 1; document.getElementById('shop-msg').innerText = "ほかに 用はあるかね？"; updateShopUI(); }
+  }
+}
+
+function handleDirection(dir) {
+  if (isFading) return; 
+  if (currentState === GAME_STATE.TITLE && hasSaveData()) { if (dir === 'up' || dir === 'down') uiSelections.title = 1 - uiSelections.title; updateScreen(); }
+  else if (currentState === GAME_STATE.FIELD) {
+    if (dir === 'up') movePlayer(0, -1, 'up'); if (dir === 'down') movePlayer(0, 1, 'down');
+    if (dir === 'left') movePlayer(-1, 0, 'left'); if (dir === 'right') movePlayer(1, 0, 'right');
+  } else if (currentState === GAME_STATE.CONFIRM) {
+    if (dir === 'up' || dir === 'down') { confirmCursor = 1 - confirmCursor; updateConfirmUI(); }
+  } else if (currentState === GAME_STATE.SHOP) {
+    let maxCursor = 0;
+    if (shopState === 'select') maxCursor = 2;
+    else if (shopState === 'buy') maxCursor = currentShopItems.length;
+    else if (shopState === 'sell') {
+      let sellableItems = player.inventory.filter(i => (i.price && i.price > 0) || (i.sellPrice !== undefined && i.sellPrice > 0));
+      maxCursor = sellableItems.length > 0 ? sellableItems.length : 0;
+    }
+    if (dir === 'up') shopCursor = Math.max(0, shopCursor - 1);
+    if (dir === 'down') shopCursor = Math.min(maxCursor, shopCursor + 1);
+    updateShopUI();
+  } else if (currentState === GAME_STATE.BATTLE && !document.getElementById('battle-commands').classList.contains('hidden') && battleMenuState !== 'end') {
+    if (battleMenuState === 'main') { if (dir === 'up') uiSelections.battle = Math.max(0, uiSelections.battle - 1); if (dir === 'down') uiSelections.battle = Math.min(4, uiSelections.battle + 1); }
+    else { let max = battleMenuState === 'magic' ? Math.max(0, player.spells.length - 1) : Math.max(0, player.inventory.length - 1); if (dir === 'up') uiSelections.battleSub = Math.max(0, uiSelections.battleSub - 1); if (dir === 'down') uiSelections.battleSub = Math.min(max, uiSelections.battleSub + 1); }
+    updateScreen();
+  } else if (currentState === GAME_STATE.MENU) {
+    if (menuState === 'main') { if (dir === 'up') uiSelections.menuMain = Math.max(0, uiSelections.menuMain - 1); if (dir === 'down') uiSelections.menuMain = Math.min(5, uiSelections.menuMain + 1); }
+    else if (menuState === 'equip_tab') { if (dir === 'up') menuIndices.equipTab = Math.max(0, menuIndices.equipTab - 1); if (dir === 'down') menuIndices.equipTab = Math.min(3, menuIndices.equipTab + 1); }
+    else if (menuState === 'equip_list') { if (dir === 'up') menuIndices.equipList = Math.max(0, menuIndices.equipList - 1); if (dir === 'down') menuIndices.equipList = Math.min(filteredItems.length, menuIndices.equipList + 1); }
+    else if (menuState === 'item_list') { if (dir === 'up') menuIndices.itemList = Math.max(0, menuIndices.itemList - 1); if (dir === 'down') menuIndices.itemList = Math.min(Math.max(0, player.inventory.length - 1), menuIndices.itemList + 1); }
+    else if (menuState === 'item_action') { if (dir === 'up') menuIndices.itemAction = Math.max(0, menuIndices.itemAction - 1); if (dir === 'down') menuIndices.itemAction = Math.min(1, menuIndices.itemAction + 1); }
+    else if (menuState === 'item_use_count') {
+      let item = player.inventory[selectedItemIndex];
+      if (dir === 'left') useItemCount = Math.max(1, useItemCount - 1);
+      if (dir === 'right') useItemCount = Math.min(item.count, useItemCount + 1);
+      if (dir === 'up') useItemCount = Math.min(item.count, useItemCount + 10);
+      if (dir === 'down') useItemCount = Math.max(1, useItemCount - 10);
+      if (useItemCount > item.count) useItemCount = item.count;
+    }
+    else if (menuState === 'magic_list') { if (dir === 'up') menuIndices.magicList = Math.max(0, menuIndices.magicList - 1); if (dir === 'down') menuIndices.magicList = Math.min(Math.max(0, player.spells.length - 1), menuIndices.magicList + 1); }
+    else if (menuState === 'rula_list') { if (dir === 'up') menuIndices.rulaList = Math.max(0, menuIndices.rulaList - 1); if (dir === 'down') menuIndices.rulaList = Math.min(Math.max(0, rulaTargets.length - 1), menuIndices.rulaList + 1); }
+    updateMenuUI();
+  }
+}
+
+document.getElementById('btn-ok').addEventListener('pointerdown', (e) => { e.preventDefault(); handleOk(); });
+document.getElementById('btn-cancel').addEventListener('pointerdown', (e) => { e.preventDefault(); handleCancel(); });
+document.getElementById('btn-menu').addEventListener('pointerdown', (e) => { e.preventDefault(); if (currentState === GAME_STATE.FIELD && !isFading) { uiSelections.menuMain = 0; menuState = 'main'; switchState(GAME_STATE.MENU); } });
+['up', 'down', 'left', 'right'].forEach(dir => document.getElementById('btn-' + dir).addEventListener('pointerdown', (e) => { e.preventDefault(); handleDirection(dir); }));
+window.addEventListener('keydown', (e) => { if (e.key === 'ArrowUp') handleDirection('up'); if (e.key === 'ArrowDown') handleDirection('down'); if (e.key === 'ArrowLeft') handleDirection('left'); if (e.key === 'ArrowRight') handleDirection('right'); if (e.key === 'Enter' || e.key === 'z') handleOk(); if (e.key === 'Escape' || e.key === 'x') handleCancel(); });
+
+window.onload = preloadImagesAndInit;
+</script>
+</body>
+</html>
